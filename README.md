@@ -25,6 +25,10 @@ npm start
 
 Komputer dan perangkat fisik harus berada di jaringan yang saling terjangkau; firewall perlu mengizinkan port API. `EXPO_PUBLIC_*` tertanam pada bundle aplikasi, jadi hanya boleh berisi konfigurasi publik seperti alamat API—jangan pernah menaruh token atau rahasia di sana.
 
+## Pengujian
+
+Jalankan `npm test` untuk menguji permintaan katalog, RFQ, pelacakan, respons HTTP, dan kegagalan koneksi tanpa server API.
+
 ## Sinkronisasi
 
 Katalog, pengiriman RFQ, dan status pelacakan menggunakan API dan database yang sama dengan aplikasi web. Buat permintaan dari salah satu klien, simpan kode pelacakan, lalu masukkan kode itu di klien lainnya untuk membaca statusnya. Kontrak endpoint: [OpenAPI di repo web](https://github.com/muchlisbstg/export-client-web-sync/blob/main/docs/openapi.yaml).
