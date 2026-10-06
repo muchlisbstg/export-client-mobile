@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -55,6 +55,8 @@ export default function App() {
   const [quantity, setQuantity] = useState("1000");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [tracking, setTracking] = useState(false);
+  const trackingLock = useRef(false);
   const [error, setError] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
   const [trackingInput, setTrackingInput] = useState("");
@@ -109,12 +111,24 @@ export default function App() {
   }
 
   async function lookup() {
+    if (trackingLock.current) return;
+    const code = trackingInput.trim();
     setError("");
     setTrackedInquiry(null);
+    if (!code) {
+      setError("Masukkan kode pelacakan.");
+      return;
+    }
+
+    trackingLock.current = true;
+    setTracking(true);
     try {
-      setTrackedInquiry(await trackInquiry(trackingInput));
+      setTrackedInquiry(await trackInquiry(code));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Status belum dapat dimuat.");
+    } finally {
+      trackingLock.current = false;
+      setTracking(false);
     }
   }
 
@@ -162,7 +176,16 @@ export default function App() {
           <SectionTitle eyebrow="03 — STATUS">Lacak permintaan</SectionTitle>
           <Text style={styles.cardIntro}>Masukkan kode dari aplikasi web atau mobile.</Text>
           <Field label="Kode pelacakan" value={trackingInput} onChangeText={setTrackingInput} placeholder="24 karakter" autoCapitalize="characters" />
-          <Pressable style={styles.secondaryButton} onPress={() => void lookup()} accessibilityRole="button"><Text style={styles.secondaryButtonText}>Periksa status <Text style={styles.buttonArrow}>→</Text></Text></Pressable>
+          <Pressable
+            style={[styles.secondaryButton, tracking && styles.disabledButton]}
+            onPress={() => void lookup()}
+            disabled={tracking}
+            accessibilityRole="button"
+            accessibilityLabel={tracking ? "Sedang memeriksa status" : "Periksa status"}
+            accessibilityState={{ disabled: tracking }}
+          >
+            {tracking ? <ActivityIndicator color={colors.green} /> : <Text style={styles.secondaryButtonText}>Periksa status <Text style={styles.buttonArrow}>→</Text></Text>}
+          </Pressable>
           {trackedInquiry ? <View style={styles.statusBox}><View style={styles.liveDot} /><View style={styles.statusCopy}><Text style={styles.statusTitle}>{trackedInquiry.status === "received" ? "Diterima" : trackedInquiry.status}</Text><Text style={styles.statusMeta}>{trackedInquiry.productName} · {new Date(trackedInquiry.createdAt).toLocaleString("id-ID")}</Text></View></View> : null}
           <Text style={styles.privacyNote}>Kode pelacakan bersifat privat. Jangan bagikan kepada orang lain.</Text>
         </View>
