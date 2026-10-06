@@ -43,6 +43,16 @@ async function waitForTracking(base, code) {
   throw new Error(`Inquiry ${code} did not replicate to ${base}`);
 }
 
+async function waitForOutboxState(db, inquiryId, peerNodeId, condition, expectedState) {
+  const find = db.prepare("SELECT attempt_count AS attemptCount FROM sync_outbox WHERE inquiry_id=? AND peer_node_id=?");
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const row = find.get(inquiryId, peerNodeId);
+    if (condition(row)) return row;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Outbox did not reach ${expectedState} for ${inquiryId} -> ${peerNodeId}`);
+}
+
 test("health, catalog, create and tracking match the shared API contract", async () => {
   const { base } = await boot();
   const health = await (await fetch(`${base}/health`)).json();
@@ -73,6 +83,49 @@ test("sync is off by default and rejects unauthenticated or malformed peer recor
     method: "POST", headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" }, body: "{}",
   });
   assert.equal(malformed.status, 400);
+});
+
+test("persistent outbox resumes sync after the peer returns and the node restarts", async () => {
+  const sourcePort = await freePort();
+  const targetPort = await freePort();
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "export-mobile-recovery-"));
+  tempDirs.push(directory);
+  const sourceDbPath = path.join(directory, "source.sqlite");
+  const peerNodeId = "mobile-recovery-target";
+  const syncPeers = `${peerNodeId}=http://127.0.0.1:${targetPort}`;
+  const sourceOptions = {
+    host: "127.0.0.1",
+    port: sourcePort,
+    nodeId: "mobile-recovery-source",
+    syncSecret: secret,
+    syncPeers,
+    dbPath: sourceDbPath,
+  };
+  const firstSource = createServer(sourceOptions);
+  services.push(firstSource);
+  const firstStarted = await firstSource.start();
+  const firstBase = `http://127.0.0.1:${firstStarted.port}`;
+  const createdResponse = await fetch(`${firstBase}/api/v1/inquiries`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ customerName: "Recovery Client", customerEmail: "recovery@example.test", destinationCountry: "Japan", productId: "green-coffee", quantity: 5 }),
+  });
+  assert.equal(createdResponse.status, 201);
+  const created = await createdResponse.json();
+  const sourceRecord = firstSource.db.prepare("SELECT id FROM inquiries WHERE tracking_code=?").get(created.trackingCode);
+  assert(sourceRecord);
+  const failedAttempt = await waitForOutboxState(firstSource.db, sourceRecord.id, peerNodeId, (row) => row?.attemptCount >= 1, "a persisted failed attempt");
+  assert.ok(failedAttempt.attemptCount >= 1);
+
+  await firstSource.close();
+  services.splice(services.indexOf(firstSource), 1);
+  const target = await boot({ nodeId: peerNodeId, port: targetPort, syncSecret: secret });
+  const restartedSource = createServer(sourceOptions);
+  services.push(restartedSource);
+  await restartedSource.start();
+  const replicated = await waitForTracking(target.base, created.trackingCode);
+  assert.equal(replicated.data.productName, "Kopi Arabika hijau");
+  await waitForOutboxState(restartedSource.db, sourceRecord.id, peerNodeId, (row) => !row, "successful delivery and outbox removal");
 });
 
 test("peer replication is idempotent and conflicts never overwrite stored data", async () => {
