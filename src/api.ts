@@ -20,6 +20,7 @@ export const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL?.trim() || platform
 async function readJson<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as T & { error?: string };
   if (!response.ok) {
+    if (response.status === 429) throw new Error("Batas permintaan tercapai. Coba lagi beberapa menit lagi.");
     if (response.status === 404 && payload.error === "inquiry_not_found") {
       throw new Error("Permintaan tidak ditemukan. Periksa kode pelacakan.");
     }
