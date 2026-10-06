@@ -108,6 +108,15 @@ test("peer replication is idempotent and conflicts never overwrite stored data",
   assert.equal(conflictBody.error, "sync_conflict");
   assert.match(conflictBody.existingHash, /^[a-f0-9]{64}$/);
   assert.match(conflictBody.incomingHash, /^[a-f0-9]{64}$/);
+  const collisionId = "33333333-3333-4333-8333-333333333333";
+  const codeCollision = await send({ ...record, id: collisionId, customerName: "Tracking Code Collision" });
+  assert.equal(codeCollision.status, 409);
+  const collisionBody = await codeCollision.json();
+  assert.equal(collisionBody.error, "sync_conflict");
+  assert.match(collisionBody.existingHash, /^[a-f0-9]{64}$/);
+  assert.match(collisionBody.incomingHash, /^[a-f0-9]{64}$/);
+  const collision = nodeB.service.db.prepare("SELECT reason FROM sync_conflicts WHERE inquiry_id=?").get(collisionId);
+  assert.equal(collision.reason, "tracking_code_collision");
   assert.equal(nodeB.service.db.prepare("SELECT customer_name FROM inquiries WHERE id=?").get(record.id).customer_name, "Peer Client");
   assert.equal(nodeB.service.db.prepare("SELECT COUNT(*) AS count FROM sync_conflicts WHERE inquiry_id=?").get(record.id).count, 1);
 });
