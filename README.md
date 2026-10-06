@@ -1,25 +1,36 @@
 # Platform Klien Ekspor — Mobile
 
-Repositori untuk aplikasi mobile klien ekspor.
+Aplikasi Expo/React Native yang memakai API bersama dengan [aplikasi web](https://github.com/muchlisbstg/export-client-web). API dan kontraknya dikelola di repo web.
 
-**Repo pendamping:** [aplikasi web](https://github.com/muchlisbstg/export-client-web)
+## Jalankan lokal
 
-## Cakupan produk
+Gunakan Node.js 22 atau lebih baru.
 
-Aplikasi ini ditujukan bagi klien yang menjalankan kegiatan perdagangan ekspor. Cakupan produk mengecualikan pertambangan/ekstraksi, alkohol dan wine, serta produk babi atau turunannya.
+```bash
+npm ci
+cp .env.example .env
+```
 
-## Integrasi dengan aplikasi web
+Atur `EXPO_PUBLIC_API_URL` di `.env` sesuai perangkat:
 
-Aplikasi mobile dan web dirancang sebagai dua klien terpisah yang menggunakan **satu backend/API bersama**. Sinkronisasi data pengguna dilakukan melalui backend tersebut—bukan dengan menyinkronkan kode antar-repo atau menghubungkan perangkat secara langsung.
+- Android Emulator: `http://10.0.2.2:4000`
+- iOS Simulator: `http://127.0.0.1:4000`
+- Perangkat fisik: alamat IP LAN komputer yang menjalankan server, misalnya `http://192.168.1.10:4000`
 
-Agar kedua aplikasi tetap kompatibel:
+Jalankan server dari repo web terlebih dahulu (`npm run dev:api`), lalu mulai Expo:
 
-- keduanya harus mengacu pada kontrak API dan versi endpoint yang sama;
-- autentikasi dan data bersama dikelola oleh backend;
-- perubahan model data, validasi, paginasi, dan format error perlu diterapkan konsisten pada kedua klien;
-- alamat API dikonfigurasi melalui environment (misalnya `API_BASE_URL`), bukan ditanam di kode;
-- token dan rahasia tidak boleh disimpan di repo.
+```bash
+npm start
+```
 
-## Status
+Komputer dan perangkat fisik harus berada di jaringan yang saling terjangkau; firewall perlu mengizinkan port API. `EXPO_PUBLIC_*` tertanam pada bundle aplikasi, jadi hanya boleh berisi konfigurasi publik seperti alamat API—jangan pernah menaruh token atau rahasia di sana.
 
-Repo saat ini berisi dokumentasi awal saja. Framework mobile, backend/API, autentikasi, dan implementasi aplikasi belum dipilih atau dibuat. Karena itu, sinkronisasi runtime belum aktif; bagian di atas adalah pola integrasi yang akan digunakan saat implementasi dimulai.
+## Sinkronisasi
+
+Katalog, pengiriman RFQ, dan status pelacakan menggunakan API dan database yang sama dengan aplikasi web. Buat permintaan dari salah satu klien, simpan kode pelacakan, lalu masukkan kode itu di klien lainnya untuk membaca statusnya. Kontrak endpoint: [OpenAPI di repo web](https://github.com/muchlisbstg/export-client-web/blob/main/docs/openapi.yaml).
+
+Katalog saat ini berisi data demo. Cakupan produk mengecualikan pertambangan/ekstraksi, alkohol dan wine, serta produk babi atau turunannya. MVP belum memiliki login atau alur transaksi; jangan gunakan untuk menyimpan data klien nyata sebelum kontrol akses, perlindungan data, TLS, dan kebijakan retensi siap.
+
+## Catatan audit dependensi
+
+Pada 6 Oktober 2026, `npm audit` masih melaporkan 15 temuan high pada rantai build Expo/Metro, termasuk advisori [braces](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) dan [node-forge](https://github.com/advisories/GHSA-86w9-cpqp-85rv); belum ada rilis upstream yang menutup keduanya. Advisory UUID terselesaikan dengan override `uuid` `^11.1.1`. `npm audit fix --force` menyarankan downgrade Expo SDK 57 ke SDK 44, yang tidak diterapkan karena merusak kompatibilitas SDK. Jalankan ulang audit saat SDK diperbarui dan terapkan versi patch upstream segera setelah tersedia.

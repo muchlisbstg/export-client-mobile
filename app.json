@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Export Client",
+    "slug": "export-client-mobile",
+    "scheme": "exportclient",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.muchlisbstg.exportclient"
+    }
+  }
+}

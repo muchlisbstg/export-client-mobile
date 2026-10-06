@@ -1,0 +1,190 @@
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
+
+const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
+
+type FieldProps = {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  keyboardType?: "default" | "email-address" | "numeric";
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+};
+
+function Field({ label, value, onChangeText, placeholder, keyboardType = "default", autoCapitalize = "sentences" }: FieldProps) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        style={styles.input}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#98a29b"
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+      />
+    </View>
+  );
+}
+
+function SectionTitle({ eyebrow, children }: { eyebrow: string; children: ReactNode }) {
+  return <View style={styles.sectionTitle}><Text style={styles.eyebrow}>{eyebrow}</Text><Text style={styles.sectionHeading}>{children}</Text></View>;
+}
+
+export default function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState("");
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [destinationCountry, setDestinationCountry] = useState("");
+  const [quantity, setQuantity] = useState("1000");
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [trackingCode, setTrackingCode] = useState("");
+  const [trackingInput, setTrackingInput] = useState("");
+  const [trackedInquiry, setTrackedInquiry] = useState<InquiryStatus | null>(null);
+
+  async function loadProducts() {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getProducts();
+      setProducts(data);
+      setSelectedProduct((current) => current || data[0]?.id || "");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Katalog belum dapat dimuat.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadProducts();
+  }, []);
+
+  async function submit() {
+    setError("");
+    setTrackedInquiry(null);
+    const numericQuantity = Number(quantity);
+    if (customerName.trim().length < 2 || !customerEmail.includes("@") || destinationCountry.trim().length < 2 || !selectedProduct || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+      setError("Lengkapi nama, email, negara tujuan, produk, dan jumlah dengan benar.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await createInquiry({
+        customerName: customerName.trim(),
+        customerEmail: customerEmail.trim(),
+        destinationCountry: destinationCountry.trim(),
+        productId: selectedProduct,
+        quantity: numericQuantity,
+      });
+      setTrackingCode(result.trackingCode);
+      setTrackingInput(result.trackingCode);
+      setCustomerName("");
+      setCustomerEmail("");
+      setDestinationCountry("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Permintaan gagal dikirim.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function lookup() {
+    setError("");
+    setTrackedInquiry(null);
+    try {
+      setTrackedInquiry(await trackInquiry(trackingInput));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Status belum dapat dimuat.");
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <View style={styles.brandMark}><Text style={styles.brandInitial}>E</Text></View>
+          <View style={styles.brandText}><Text style={styles.brandName}>ExportClient</Text><Text style={styles.brandCaption}>PORTAL KLIEN EKSPOR</Text></View>
+          <View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>API</Text></View>
+        </View>
+
+        <View style={styles.hero}>
+          <Text style={styles.heroKicker}>PERMINTAAN EKSPOR, LEBIH TERHUBUNG.</Text>
+          <Text style={styles.heroTitle}>Satu permintaan.{"\n"}<Text style={styles.heroAccent}>Lintas perangkat.</Text></Text>
+          <Text style={styles.heroCopy}>Katalog dan status permintaan Anda bersumber dari API bersama web dan mobile.</Text>
+        </View>
+
+        <View style={styles.card}>
+          <SectionTitle eyebrow="01 — KATALOG">Produk pilihan</SectionTitle>
+          {loading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : products.map((product, index) => (
+            <Pressable key={product.id} onPress={() => setSelectedProduct(product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }}>
+              <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
+              <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
+              <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
+            </Pressable>
+          ))}
+          <Text style={styles.demoNote}>Katalog contoh untuk pengembangan awal.</Text>
+        </View>
+
+        <View style={styles.card}>
+          <SectionTitle eyebrow="02 — RFQ">Ajukan penawaran</SectionTitle>
+          <Text style={styles.cardIntro}>Data permintaan tersimpan di server bersama, sehingga kode pelacakan dapat dipakai di aplikasi web.</Text>
+          <Field label="Nama lengkap" value={customerName} onChangeText={setCustomerName} placeholder="Nama Anda" />
+          <Field label="Email kerja" value={customerEmail} onChangeText={setCustomerEmail} placeholder="nama@perusahaan.com" keyboardType="email-address" autoCapitalize="none" />
+          <Field label="Negara tujuan" value={destinationCountry} onChangeText={setDestinationCountry} placeholder="Contoh: Jepang" />
+          <Field label="Jumlah (kg)" value={quantity} onChangeText={setQuantity} placeholder="1000" keyboardType="numeric" />
+          <Pressable style={[styles.primaryButton, (submitting || loading || products.length === 0) && styles.disabledButton]} onPress={() => void submit()} disabled={submitting || loading || products.length === 0} accessibilityRole="button">
+            {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Kirim permintaan <Text style={styles.buttonArrow}>↗</Text></Text>}
+          </Pressable>
+          {trackingCode ? <View style={styles.successBox}><Text style={styles.successTitle}>Permintaan tersimpan</Text><Text style={styles.successCopy}>Simpan kode ini untuk melacak permintaan dari perangkat mana pun.</Text><Text selectable style={styles.code}>{trackingCode}</Text></View> : null}
+        </View>
+
+        <View style={[styles.card, styles.trackCard]}>
+          <SectionTitle eyebrow="03 — STATUS">Lacak permintaan</SectionTitle>
+          <Text style={styles.cardIntro}>Masukkan kode dari aplikasi web atau mobile.</Text>
+          <Field label="Kode pelacakan" value={trackingInput} onChangeText={setTrackingInput} placeholder="24 karakter" autoCapitalize="characters" />
+          <Pressable style={styles.secondaryButton} onPress={() => void lookup()} accessibilityRole="button"><Text style={styles.secondaryButtonText}>Periksa status <Text style={styles.buttonArrow}>→</Text></Text></Pressable>
+          {trackedInquiry ? <View style={styles.statusBox}><View style={styles.liveDot} /><View style={styles.statusCopy}><Text style={styles.statusTitle}>{trackedInquiry.status === "received" ? "Diterima" : trackedInquiry.status}</Text><Text style={styles.statusMeta}>{trackedInquiry.productName} · {new Date(trackedInquiry.createdAt).toLocaleString("id-ID")}</Text></View></View> : null}
+          <Text style={styles.privacyNote}>Kode pelacakan bersifat privat. Jangan bagikan kepada orang lain.</Text>
+        </View>
+
+        {error ? <Text style={styles.errorBox} accessibilityRole="alert">{error}</Text> : null}
+        <Text style={styles.footer}>ExportClient · MVP · data demo, belum untuk transaksi</Text>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.paper },
+  content: { paddingHorizontal: 20, paddingBottom: 34, maxWidth: 680, width: "100%", alignSelf: "center" },
+  header: { flexDirection: "row", alignItems: "center", paddingTop: 20, paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: colors.line },
+  brandMark: { width: 34, height: 34, borderRadius: 11, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  brandInitial: { color: colors.white, fontSize: 17, fontWeight: "800" },
+  brandText: { flex: 1 }, brandName: { color: colors.ink, fontSize: 16, fontWeight: "800", letterSpacing: -0.6 }, brandCaption: { color: colors.muted, fontSize: 8, letterSpacing: 1.3, marginTop: 3 },
+  liveBadge: { borderWidth: 1, borderColor: colors.line, borderRadius: 30, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 7 }, liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#92b958" }, liveText: { color: colors.muted, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
+  hero: { paddingTop: 34, paddingBottom: 26 }, heroKicker: { color: colors.sage, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginBottom: 13 }, heroTitle: { color: colors.ink, fontSize: 36, lineHeight: 42, fontWeight: "600", letterSpacing: -1.9 }, heroAccent: { color: colors.sage }, heroCopy: { color: colors.muted, fontSize: 12, lineHeight: 19, marginTop: 13, maxWidth: 380 },
+  card: { backgroundColor: colors.white, borderWidth: 1, borderColor: "#e8ece5", padding: 18, marginBottom: 14 }, sectionTitle: { marginBottom: 14 }, eyebrow: { color: colors.sage, fontSize: 9, fontWeight: "800", letterSpacing: 1.4, marginBottom: 7 }, sectionHeading: { color: colors.ink, fontSize: 21, fontWeight: "700", letterSpacing: -0.7 },
+  loader: { paddingVertical: 20 }, mutedText: { color: colors.muted, fontSize: 12 }, productRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 9, borderWidth: 1, borderColor: "transparent", borderRadius: 3, marginHorizontal: -9 }, productSelected: { backgroundColor: "#f3f6ed", borderColor: "#cbd8bc" }, productIcon: { width: 42, height: 42, borderRadius: 3, alignItems: "center", justifyContent: "center", backgroundColor: "#87956f" }, productIconAlt: { backgroundColor: "#8d9062" }, productIconThird: { backgroundColor: "#947653" }, productIconText: { color: colors.white, fontSize: 11, fontWeight: "700", letterSpacing: 1 }, productCopy: { flex: 1 }, productName: { color: colors.ink, fontSize: 12, fontWeight: "700" }, productMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, radio: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "#b6c0b7", alignItems: "center", justifyContent: "center" }, radioSelected: { borderColor: colors.green }, radioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green }, demoNote: { color: "#89938d", fontSize: 9, marginTop: 9 },
+  cardIntro: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: -3, marginBottom: 15 }, field: { marginBottom: 13 }, label: { color: "#40564c", fontSize: 10, fontWeight: "700", marginBottom: 6 }, input: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingVertical: 10, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, primaryButton: { minHeight: 46, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 3, borderRadius: 2 }, primaryButtonText: { color: colors.white, fontSize: 12, fontWeight: "700", width: "100%", paddingHorizontal: 14 }, buttonArrow: { fontSize: 17 }, disabledButton: { opacity: 0.55 }, successBox: { backgroundColor: "#edf2e4", borderLeftWidth: 3, borderLeftColor: "#85a456", padding: 12, marginTop: 13 }, successTitle: { color: "#435644", fontSize: 11, fontWeight: "700" }, successCopy: { color: "#647669", fontSize: 10, lineHeight: 15, marginTop: 4 }, code: { color: colors.green, fontSize: 14, fontWeight: "800", letterSpacing: 1.2, marginTop: 8 },
+  trackCard: { backgroundColor: "#f1f3eb" }, secondaryButton: { minHeight: 43, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", borderRadius: 2 }, secondaryButtonText: { color: colors.green, fontSize: 11, fontWeight: "800" }, statusBox: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, marginTop: 12, backgroundColor: "#e8efdf" }, statusCopy: { flex: 1 }, statusTitle: { color: colors.green, fontSize: 11, fontWeight: "800", textTransform: "capitalize" }, statusMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, privacyNote: { color: "#858f88", fontSize: 9, lineHeight: 14, marginTop: 14 }, errorBox: { color: colors.danger, backgroundColor: "#fff0ee", borderWidth: 1, borderColor: "#f0d1cc", padding: 12, marginBottom: 13, fontSize: 11, lineHeight: 16 }, footer: { color: "#8b968f", fontSize: 9, textAlign: "center", marginTop: 7 }
+});
