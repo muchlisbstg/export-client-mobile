@@ -1,6 +1,6 @@
 # Platform Klien Ekspor — Mobile
 
-Aplikasi Expo/React Native yang memakai API bersama dengan [aplikasi web](https://github.com/muchlisbstg/export-client-web). API dan kontraknya dikelola di repo web.
+Aplikasi Expo/React Native yang memakai API bersama dengan [aplikasi web](https://github.com/muchlisbstg/export-client-web-sync). API dan kontraknya dikelola di repo web.
 
 ## Jalankan lokal
 
@@ -27,7 +27,7 @@ Komputer dan perangkat fisik harus berada di jaringan yang saling terjangkau; fi
 
 ## Sinkronisasi
 
-Katalog, pengiriman RFQ, dan status pelacakan menggunakan API dan database yang sama dengan aplikasi web. Buat permintaan dari salah satu klien, simpan kode pelacakan, lalu masukkan kode itu di klien lainnya untuk membaca statusnya. Kontrak endpoint: [OpenAPI di repo web](https://github.com/muchlisbstg/export-client-web/blob/main/docs/openapi.yaml).
+Katalog, pengiriman RFQ, dan status pelacakan menggunakan API dan database yang sama dengan aplikasi web. Buat permintaan dari salah satu klien, simpan kode pelacakan, lalu masukkan kode itu di klien lainnya untuk membaca statusnya. Kontrak endpoint: [OpenAPI di repo web](https://github.com/muchlisbstg/export-client-web-sync/blob/main/docs/openapi.yaml).
 
 Katalog saat ini berisi data demo. Cakupan produk mengecualikan pertambangan/ekstraksi, alkohol dan wine, serta produk babi atau turunannya. MVP belum memiliki login atau alur transaksi; jangan gunakan untuk menyimpan data klien nyata sebelum kontrol akses, perlindungan data, TLS, dan kebijakan retensi siap.
 
