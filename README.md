@@ -1,40 +1,59 @@
 # Platform Klien Ekspor — Mobile
 
-Aplikasi Expo/React Native yang memakai API bersama dengan [aplikasi web](https://github.com/muchlisbstg/export-client-web-sync). API dan kontraknya dikelola di repo web.
+Aplikasi Expo/React Native ini memakai **backend mandiri di repo ini** secara default. Backend adalah peer append-only: setiap node menyimpan dan meneruskan inquiry baru, tanpa master. Inquiry tidak dapat diedit atau dihapus.
 
-## Jalankan lokal
+## Jalankan API lokal
 
 Gunakan Node.js 22 atau lebih baru.
 
 ```bash
 npm ci
-cp .env.example .env
+cp .env.api.example .env.api
+npm run dev:api
 ```
 
-Atur `EXPO_PUBLIC_API_URL` di `.env` sesuai perangkat:
+API mendengarkan `0.0.0.0:4001` (ubah `API_PORT` bila perlu) dan membuat SQLite lokal di `server/data/api.sqlite`. Katalog berisi produk demo. Jangan memasukkan data klien nyata. File `.env.api` hanya untuk server dan tidak dibundle ke Expo.
 
-- Android Emulator: `http://10.0.2.2:4000`
-- iOS Simulator: `http://127.0.0.1:4000`
-- Perangkat fisik: alamat IP LAN komputer yang menjalankan server, misalnya `http://192.168.1.10:4000`
+Endpoint standar:
 
-Jalankan server dari repo web terlebih dahulu (`npm run dev:api`), lalu mulai Expo:
+- `GET /health`
+- `GET /api/v1/products`
+- `POST /api/v1/inquiries`
+- `GET /api/v1/inquiries/:trackingCode`
+
+## Jalankan Expo
+
+Salin konfigurasi publik hanya bila ingin mengganti default:
 
 ```bash
+cp .env.example .env
 npm start
 ```
 
-Komputer dan perangkat fisik harus berada di jaringan yang saling terjangkau; firewall perlu mengizinkan port API. `EXPO_PUBLIC_*` tertanam pada bundle aplikasi, jadi hanya boleh berisi konfigurasi publik seperti alamat API—jangan pernah menaruh token atau rahasia di sana.
+Default aplikasi adalah `http://10.0.2.2:4001` pada Android Emulator dan `http://127.0.0.1:4001` pada iOS Simulator. Untuk perangkat fisik, set `EXPO_PUBLIC_API_URL` ke IP LAN komputer, misalnya `http://192.168.1.10:4001`. `EXPO_PUBLIC_*` tertanam di bundle aplikasi; alamat API boleh publik, tetapi **jangan pernah menaruh token atau secret di sana**.
 
-## Pengujian
+Komputer dan perangkat harus saling menjangkau. Buka firewall hanya untuk port API yang diperlukan dan jaringan tepercaya. Untuk jaringan non-local, gunakan reverse proxy/TLS (`https://`) dan jangan mengirim secret melalui HTTP biasa.
 
-Jalankan `npm test` untuk menguji permintaan katalog, RFQ, pelacakan, respons HTTP, dan kegagalan koneksi tanpa server API.
+## Peer sync (opsional)
 
-## Sinkronisasi
+Sync nonaktif jika `SYNC_SHARED_SECRET` kosong. Untuk mengaktifkannya, di setiap node gunakan `SYNC_NODE_ID` unik, secret bersama, dan daftar peer:
 
-Katalog, pengiriman RFQ, dan status pelacakan menggunakan API dan database yang sama dengan aplikasi web. Buat permintaan dari salah satu klien, simpan kode pelacakan, lalu masukkan kode itu di klien lainnya untuk membaca statusnya. Kontrak endpoint: [OpenAPI di repo web](https://github.com/muchlisbstg/export-client-web-sync/blob/main/docs/openapi.yaml).
+```dotenv
+SYNC_NODE_ID=mobile-local
+SYNC_SHARED_SECRET=<secret-random-minimal-32-karakter-yang-sama-pada-ketiga-backend>
+SYNC_PEERS=web-local=https://web.example:4000,desktop-local=https://desktop.example:4002
+```
 
-Katalog saat ini berisi data demo. Cakupan produk mengecualikan pertambangan/ekstraksi, alkohol dan wine, serta produk babi atau turunannya. MVP belum memiliki login atau alur transaksi; jangan gunakan untuk menyimpan data klien nyata sebelum kontrol akses, perlindungan data, TLS, dan kebijakan retensi siap.
+`SYNC_PEERS` harus berupa `nodeId=http(s)://host:port`; URL dengan username/password, query, atau fragment ditolak. Gunakan `openssl rand -hex 32` untuk membuat secret; jangan menaruhnya di Expo config. Endpoint internal `POST /api/v1/sync/inquiries` memerlukan `Authorization: Bearer ...`. Outbox dan conflict log persisten di SQLite, dengan retry/backoff dan timeout. Node tidak mengirim kembali ke origin atau dirinya sendiri; penerimaan ulang yang identik idempotent, sedangkan ID/tracking code yang sama dengan isi berbeda dicatat sebagai konflik tanpa overwrite dan mengembalikan HTTP 409.
 
-## Catatan audit dependensi
+## Pengujian dan pemeriksaan
 
-Pada 6 Oktober 2026, `npm audit` masih melaporkan 15 temuan high pada rantai build Expo/Metro, termasuk advisori [braces](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) dan [node-forge](https://github.com/advisories/GHSA-86w9-cpqp-85rv); belum ada rilis upstream yang menutup keduanya. Advisory UUID terselesaikan dengan override `uuid` `^11.1.1`. `npm audit fix --force` menyarankan downgrade Expo SDK 57 ke SDK 44, yang tidak diterapkan karena merusak kompatibilitas SDK. Jalankan ulang audit saat SDK diperbarui dan terapkan versi patch upstream segera setelah tersedia.
+```bash
+npm test
+npm run typecheck
+npx expo export --platform android
+```
+
+Tes backend memakai database sementara dan mencakup health, katalog, create/track, sync disabled, autentikasi, replikasi idempotent, serta conflict non-overwrite. Tes API client tetap dijalankan dalam suite yang sama. Perintah export Android adalah compatibility check dan tidak melakukan deployment.
+
+Tidak ada login/admin, edit status, retensi, penghapusan, deployment, atau koneksi ke data klien nyata dalam MVP ini.

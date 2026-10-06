@@ -144,7 +144,7 @@ export default function App() {
         <View style={styles.hero}>
           <Text style={styles.heroKicker}>PERMINTAAN EKSPOR, LEBIH TERHUBUNG.</Text>
           <Text style={styles.heroTitle}>Satu permintaan.{"\n"}<Text style={styles.heroAccent}>Lintas perangkat.</Text></Text>
-          <Text style={styles.heroCopy}>Katalog dan status permintaan Anda bersumber dari API bersama web dan mobile.</Text>
+          <Text style={styles.heroCopy}>Katalog dan status tersimpan di backend lokal mobile. Peer sync opsional menghubungkan web dan desktop.</Text>
         </View>
 
         <View style={styles.card}>
@@ -161,7 +161,7 @@ export default function App() {
 
         <View style={styles.card}>
           <SectionTitle eyebrow="02 — RFQ">Ajukan penawaran</SectionTitle>
-          <Text style={styles.cardIntro}>Data permintaan tersimpan di server bersama, sehingga kode pelacakan dapat dipakai di aplikasi web.</Text>
+          <Text style={styles.cardIntro}>Data tersimpan di SQLite lokal. Jika peer sync dikonfigurasi, kode ini dapat dilacak dari web atau desktop.</Text>
           <Field label="Nama lengkap" value={customerName} onChangeText={setCustomerName} placeholder="Nama Anda" />
           <Field label="Email kerja" value={customerEmail} onChangeText={setCustomerEmail} placeholder="nama@perusahaan.com" keyboardType="email-address" autoCapitalize="none" />
           <Field label="Negara tujuan" value={destinationCountry} onChangeText={setDestinationCountry} placeholder="Contoh: Jepang" />
@@ -174,7 +174,7 @@ export default function App() {
 
         <View style={[styles.card, styles.trackCard]}>
           <SectionTitle eyebrow="03 — STATUS">Lacak permintaan</SectionTitle>
-          <Text style={styles.cardIntro}>Masukkan kode dari aplikasi web atau mobile.</Text>
+          <Text style={styles.cardIntro}>Masukkan kode dari node web, mobile, atau desktop yang sudah tersinkron.</Text>
           <Field label="Kode pelacakan" value={trackingInput} onChangeText={setTrackingInput} placeholder="24 karakter" autoCapitalize="characters" />
           <Pressable
             style={[styles.secondaryButton, tracking && styles.disabledButton]}
