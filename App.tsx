@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
+import { filterProducts, getCategories } from "./src/catalog-filter";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
@@ -61,6 +62,9 @@ export default function App() {
   const [trackingCode, setTrackingCode] = useState("");
   const [trackingInput, setTrackingInput] = useState("");
   const [trackedInquiry, setTrackedInquiry] = useState<InquiryStatus | null>(null);
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogCategory, setCatalogCategory] = useState("");
+  const catalogSearchRef = useRef<TextInput>(null);
 
   async function loadProducts() {
     setLoading(true);
@@ -79,6 +83,18 @@ export default function App() {
   useEffect(() => {
     void loadProducts();
   }, []);
+
+  const categories = getCategories(products);
+  const visibleProducts = filterProducts(products, catalogQuery, catalogCategory);
+  const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0;
+  const selectedProductRecord = products.find((product) => product.id === selectedProduct);
+  const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
+
+  function resetCatalogFilters() {
+    setCatalogQuery("");
+    setCatalogCategory("");
+    catalogSearchRef.current?.focus();
+  }
 
   async function submit() {
     setError("");
@@ -149,13 +165,26 @@ export default function App() {
 
         <View style={styles.card}>
           <SectionTitle eyebrow="01 — KATALOG">Produk pilihan</SectionTitle>
-          {loading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : products.map((product, index) => (
-            <Pressable key={product.id} onPress={() => setSelectedProduct(product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }}>
-              <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
-              <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
-              <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
-            </Pressable>
-          ))}
+          {loading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : <>
+            <View style={styles.searchWrap}>
+              <TextInput ref={catalogSearchRef} accessibilityLabel="Cari nama, kategori, atau asal" style={styles.searchInput} value={catalogQuery} onChangeText={setCatalogQuery} placeholder="Cari nama, kategori, atau asal" placeholderTextColor="#98a29b" autoCapitalize="none" autoCorrect={false} />
+              {catalogQuery.length > 0 ? <Pressable onPress={() => setCatalogQuery("")} style={styles.clearButton} accessibilityRole="button" accessibilityLabel="Bersihkan pencarian"><Text style={styles.clearButtonText}>×</Text></Pressable> : null}
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled">
+              <Pressable onPress={() => setCatalogCategory("")} style={[styles.categoryChip, !catalogCategory && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogCategory }}><Text style={[styles.categoryChipText, !catalogCategory && styles.categoryChipTextSelected]}>Semua</Text></Pressable>
+              {categories.map((category) => <Pressable key={category} onPress={() => setCatalogCategory(category)} style={[styles.categoryChip, catalogCategory === category && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogCategory === category }}><Text style={[styles.categoryChipText, catalogCategory === category && styles.categoryChipTextSelected]}>{category}</Text></Pressable>)}
+            </ScrollView>
+            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
+            {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
+            {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>Tidak ada produk yang cocok</Text><Text style={styles.emptyFilterCopy}>Coba ubah kata pencarian atau kategori.</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>Hapus filter</Text></Pressable></View> : visibleProducts.map((product) => {
+              const index = products.findIndex((item) => item.id === product.id);
+              return <Pressable key={product.id} onPress={() => setSelectedProduct(product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }}>
+                <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
+                <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
+                <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
+              </Pressable>;
+            })}
+          </>}
           <Text style={styles.demoNote}>Katalog contoh untuk pengembangan awal.</Text>
         </View>
 
@@ -207,7 +236,7 @@ const styles = StyleSheet.create({
   liveBadge: { borderWidth: 1, borderColor: colors.line, borderRadius: 30, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 7 }, liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#92b958" }, liveText: { color: colors.muted, fontSize: 9, fontWeight: "700", letterSpacing: 1 },
   hero: { paddingTop: 34, paddingBottom: 26 }, heroKicker: { color: colors.sage, fontSize: 9, fontWeight: "800", letterSpacing: 1.5, marginBottom: 13 }, heroTitle: { color: colors.ink, fontSize: 36, lineHeight: 42, fontWeight: "600", letterSpacing: -1.9 }, heroAccent: { color: colors.sage }, heroCopy: { color: colors.muted, fontSize: 12, lineHeight: 19, marginTop: 13, maxWidth: 380 },
   card: { backgroundColor: colors.white, borderWidth: 1, borderColor: "#e8ece5", padding: 18, marginBottom: 14 }, sectionTitle: { marginBottom: 14 }, eyebrow: { color: colors.sage, fontSize: 9, fontWeight: "800", letterSpacing: 1.4, marginBottom: 7 }, sectionHeading: { color: colors.ink, fontSize: 21, fontWeight: "700", letterSpacing: -0.7 },
-  loader: { paddingVertical: 20 }, mutedText: { color: colors.muted, fontSize: 12 }, productRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 9, borderWidth: 1, borderColor: "transparent", borderRadius: 3, marginHorizontal: -9 }, productSelected: { backgroundColor: "#f3f6ed", borderColor: "#cbd8bc" }, productIcon: { width: 42, height: 42, borderRadius: 3, alignItems: "center", justifyContent: "center", backgroundColor: "#87956f" }, productIconAlt: { backgroundColor: "#8d9062" }, productIconThird: { backgroundColor: "#947653" }, productIconText: { color: colors.white, fontSize: 11, fontWeight: "700", letterSpacing: 1 }, productCopy: { flex: 1 }, productName: { color: colors.ink, fontSize: 12, fontWeight: "700" }, productMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, radio: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "#b6c0b7", alignItems: "center", justifyContent: "center" }, radioSelected: { borderColor: colors.green }, radioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green }, demoNote: { color: "#89938d", fontSize: 9, marginTop: 9 },
+  loader: { paddingVertical: 20 }, mutedText: { color: colors.muted, fontSize: 12 }, searchWrap: { position: "relative", justifyContent: "center", marginBottom: 10 }, searchInput: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingRight: 40, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, clearButton: { position: "absolute", right: 8, width: 30, height: 30, alignItems: "center", justifyContent: "center" }, clearButtonText: { color: colors.muted, fontSize: 23, lineHeight: 25 }, categoryChips: { gap: 7, paddingBottom: 11, paddingRight: 14 }, categoryChip: { borderWidth: 1, borderColor: colors.line, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.white }, categoryChipSelected: { backgroundColor: colors.green, borderColor: colors.green }, categoryChipText: { color: colors.muted, fontSize: 10, fontWeight: "700" }, categoryChipTextSelected: { color: colors.white }, resultHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }, resultCount: { color: colors.muted, fontSize: 10, fontWeight: "700" }, resetText: { color: colors.green, fontSize: 10, fontWeight: "800" }, selectedHidden: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, backgroundColor: "#f3f6ed", borderLeftWidth: 3, borderLeftColor: colors.sage, padding: 10, marginVertical: 8 }, selectedHiddenText: { color: colors.ink, fontSize: 10, flex: 1 }, showSelectedText: { color: colors.green, fontSize: 10, fontWeight: "800" }, emptyFilter: { alignItems: "center", paddingVertical: 22, paddingHorizontal: 8 }, emptyFilterTitle: { color: colors.ink, fontSize: 13, fontWeight: "800" }, emptyFilterCopy: { color: colors.muted, fontSize: 10, marginTop: 5 }, emptyAction: { marginTop: 12, paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: colors.green, borderRadius: 2 }, emptyActionText: { color: colors.green, fontSize: 10, fontWeight: "800" }, productRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 9, borderWidth: 1, borderColor: "transparent", borderRadius: 3, marginHorizontal: -9 }, productSelected: { backgroundColor: "#f3f6ed", borderColor: "#cbd8bc" }, productIcon: { width: 42, height: 42, borderRadius: 3, alignItems: "center", justifyContent: "center", backgroundColor: "#87956f" }, productIconAlt: { backgroundColor: "#8d9062" }, productIconThird: { backgroundColor: "#947653" }, productIconText: { color: colors.white, fontSize: 11, fontWeight: "700", letterSpacing: 1 }, productCopy: { flex: 1 }, productName: { color: colors.ink, fontSize: 12, fontWeight: "700" }, productMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, radio: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "#b6c0b7", alignItems: "center", justifyContent: "center" }, radioSelected: { borderColor: colors.green }, radioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green }, demoNote: { color: "#89938d", fontSize: 9, marginTop: 9 },
   cardIntro: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: -3, marginBottom: 15 }, field: { marginBottom: 13 }, label: { color: "#40564c", fontSize: 10, fontWeight: "700", marginBottom: 6 }, input: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingVertical: 10, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, primaryButton: { minHeight: 46, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 3, borderRadius: 2 }, primaryButtonText: { color: colors.white, fontSize: 12, fontWeight: "700", width: "100%", paddingHorizontal: 14 }, buttonArrow: { fontSize: 17 }, disabledButton: { opacity: 0.55 }, successBox: { backgroundColor: "#edf2e4", borderLeftWidth: 3, borderLeftColor: "#85a456", padding: 12, marginTop: 13 }, successTitle: { color: "#435644", fontSize: 11, fontWeight: "700" }, successCopy: { color: "#647669", fontSize: 10, lineHeight: 15, marginTop: 4 }, code: { color: colors.green, fontSize: 14, fontWeight: "800", letterSpacing: 1.2, marginTop: 8 },
   trackCard: { backgroundColor: "#f1f3eb" }, secondaryButton: { minHeight: 43, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", borderRadius: 2 }, secondaryButtonText: { color: colors.green, fontSize: 11, fontWeight: "800" }, statusBox: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, marginTop: 12, backgroundColor: "#e8efdf" }, statusCopy: { flex: 1 }, statusTitle: { color: colors.green, fontSize: 11, fontWeight: "800", textTransform: "capitalize" }, statusMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, privacyNote: { color: "#858f88", fontSize: 9, lineHeight: 14, marginTop: 14 }, errorBox: { color: colors.danger, backgroundColor: "#fff0ee", borderWidth: 1, borderColor: "#f0d1cc", padding: 12, marginBottom: 13, fontSize: 11, lineHeight: 16 }, footer: { color: "#8b968f", fontSize: 9, textAlign: "center", marginTop: 7 }
 });
