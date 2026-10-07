@@ -101,6 +101,26 @@ test("sync is off by default and rejects unauthenticated or malformed peer recor
   assert.equal(malformed.status, 400);
 });
 
+test("outbound replication waits for both a secret and a configured peer", async () => {
+  const peerPort = await freePort();
+  const partialConfigurations = [
+    { nodeId: "mobile-secret-only", syncSecret: secret },
+    { nodeId: "mobile-peers-only", syncPeers: `mobile-target=http://127.0.0.1:${peerPort}` },
+  ];
+
+  for (const options of partialConfigurations) {
+    const { base, service } = await boot(options);
+    const created = await fetch(`${base}/api/v1/inquiries`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ customerName: "Partial Config Client", customerEmail: "partial@example.com", destinationCountry: "Japan", productId: "green-coffee", quantity: 50 }),
+    });
+    assert.equal(created.status, 201);
+    const { count } = service.db.prepare("SELECT COUNT(*) AS count FROM sync_outbox").get();
+    assert.equal(count, 0, `${options.nodeId} must not queue outbound sync with partial configuration`);
+  }
+});
+
 test("persistent outbox resumes sync after the peer returns and the node restarts", async () => {
   const sourcePort = await freePort();
   const targetPort = await freePort();
