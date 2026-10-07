@@ -317,7 +317,8 @@ export function createServer(options = {}) {
   });
 
   app.use((error, _req, res, _next) => {
-    if (error instanceof SyntaxError) return res.status(400).json({ error: "invalid_json" });
+    if (error?.type === "entity.parse.failed") return res.status(400).json({ error: "invalid_json" });
+    if (error?.type === "entity.too.large") return res.status(413).json({ error: "payload_too_large" });
     return res.status(500).json({ error: "internal_server_error" });
   });
 

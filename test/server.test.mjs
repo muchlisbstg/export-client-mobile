@@ -71,6 +71,22 @@ test("health, catalog, create and tracking match the shared API contract", async
   assert.equal("customerEmail" in tracked.data, false);
 });
 
+test("JSON parser errors use stable 400 and 413 responses", async () => {
+  const { base } = await boot();
+  const malformed = await fetch(`${base}/api/v1/inquiries`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: '{"customerName":',
+  });
+  assert.equal(malformed.status, 400);
+  assert.deepEqual(await malformed.json(), { error: "invalid_json" });
+
+  const oversized = await fetch(`${base}/api/v1/inquiries`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ padding: "x".repeat(17 * 1024) }),
+  });
+  assert.equal(oversized.status, 413);
+  assert.deepEqual(await oversized.json(), { error: "payload_too_large" });
+});
+
 test("sync is off by default and rejects unauthenticated or malformed peer records", async () => {
   const { base } = await boot();
   const disabled = await fetch(`${base}/api/v1/sync/inquiries`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
