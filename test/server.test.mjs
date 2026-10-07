@@ -3,7 +3,7 @@ import test, { afterEach } from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createServer } from "../server/index.mjs";
+import { createServer, parsePeers } from "../server/index.mjs";
 
 const tempDirs = [];
 const services = [];
@@ -52,6 +52,12 @@ async function waitForOutboxState(db, inquiryId, peerNodeId, condition, expected
   }
   throw new Error(`Outbox did not reach ${expectedState} for ${inquiryId} -> ${peerNodeId}`);
 }
+
+test("HTTP IPv6 loopback peers are accepted for local development", () => {
+  assert.deepEqual(parsePeers("web-peer=http://[::1]:4000", "mobile-local"), [
+    { nodeId: "web-peer", baseUrl: "http://[::1]:4000" },
+  ]);
+});
 
 test("health, catalog, create and tracking match the shared API contract", async () => {
   const { base } = await boot();
