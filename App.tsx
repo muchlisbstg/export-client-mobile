@@ -55,6 +55,7 @@ export default function App() {
   const [destinationCountry, setDestinationCountry] = useState("");
   const [quantity, setQuantity] = useState("1000");
   const [loading, setLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [tracking, setTracking] = useState(false);
   const trackingLock = useRef(false);
@@ -70,13 +71,14 @@ export default function App() {
 
   async function loadProducts() {
     setLoading(true);
+    setCatalogError("");
     setError("");
     try {
       const data = await getProducts();
       setProducts(data);
       setSelectedProduct((current) => current || data[0]?.id || "");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Katalog belum dapat dimuat.");
+      setCatalogError(caught instanceof Error ? caught.message : "Katalog belum dapat dimuat.");
     } finally {
       setLoading(false);
     }
@@ -167,7 +169,11 @@ export default function App() {
 
         <View style={styles.card}>
           <SectionTitle eyebrow="01 — KATALOG">Produk pilihan</SectionTitle>
-          {loading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : <>
+          {loading ? <ActivityIndicator color={colors.sage} style={styles.loader} /> : catalogError ? <View style={[styles.emptyFilter, { borderWidth: 1, borderColor: "#f0d1cc", backgroundColor: "#fff8f6" }]} accessibilityRole="alert">
+            <Text style={[styles.emptyFilterTitle, { color: colors.danger }]}>Katalog tidak dapat dimuat</Text>
+            <Text style={styles.emptyFilterCopy}>{catalogError}</Text>
+            <Pressable onPress={() => void loadProducts()} style={[styles.emptyAction, { backgroundColor: colors.green, borderColor: colors.green }]} accessibilityRole="button"><Text style={[styles.emptyActionText, { color: colors.white }]}>Coba lagi</Text></Pressable>
+          </View> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : <>
             <View style={styles.searchWrap}>
               <TextInput ref={catalogSearchRef} accessibilityLabel="Cari nama, kategori, atau asal" style={styles.searchInput} value={catalogQuery} onChangeText={setCatalogQuery} placeholder="Cari nama, kategori, atau asal" placeholderTextColor="#98a29b" autoCapitalize="none" autoCorrect={false} />
               {catalogQuery.length > 0 ? <Pressable onPress={() => setCatalogQuery("")} style={styles.clearButton} accessibilityRole="button" accessibilityLabel="Bersihkan pencarian"><Text style={styles.clearButtonText}>×</Text></Pressable> : null}
