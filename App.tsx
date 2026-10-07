@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
 import { catalogSortOptions, filterProducts, getCategories, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
@@ -20,17 +21,19 @@ type FieldProps = {
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
-  keyboardType?: "default" | "email-address" | "numeric";
+  error?: string;
+  keyboardType?: "default" | "email-address" | "numeric" | "decimal-pad";
   autoCapitalize?: "none" | "sentences" | "words" | "characters";
 };
 
-function Field({ label, value, onChangeText, placeholder, keyboardType = "default", autoCapitalize = "sentences" }: FieldProps) {
+function Field({ label, value, onChangeText, placeholder, error, keyboardType = "default", autoCapitalize = "sentences" }: FieldProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
-        style={styles.input}
+        accessibilityHint={error ? `Kesalahan: ${error}` : undefined}
+        style={[styles.input, error ? { borderColor: colors.danger } : undefined]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -39,6 +42,7 @@ function Field({ label, value, onChangeText, placeholder, keyboardType = "defaul
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
       />
+      {error ? <Text style={{ color: colors.danger, fontSize: 10, lineHeight: 15, marginTop: 5 }} accessibilityRole="alert" accessibilityLiveRegion="polite">{error}</Text> : null}
     </View>
   );
 }
@@ -54,6 +58,7 @@ export default function App() {
   const [customerEmail, setCustomerEmail] = useState("");
   const [destinationCountry, setDestinationCountry] = useState("");
   const [quantity, setQuantity] = useState("1000");
+  const [fieldErrors, setFieldErrors] = useState<InquiryFieldErrors>({});
   const [loading, setLoading] = useState(true);
   const [catalogError, setCatalogError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -100,14 +105,31 @@ export default function App() {
     catalogSearchRef.current?.focus();
   }
 
+  function updateInquiryField(field: InquiryField, value: string) {
+    switch (field) {
+      case "customerName": setCustomerName(value); break;
+      case "customerEmail": setCustomerEmail(value); break;
+      case "destinationCountry": setDestinationCountry(value); break;
+      case "productId": setSelectedProduct(value); break;
+      case "quantity": setQuantity(value); break;
+    }
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      const message = validateInquiryField(field, value);
+      const next = { ...current };
+      if (message) next[field] = message;
+      else delete next[field];
+      return next;
+    });
+  }
+
   async function submit() {
     setError("");
     setTrackedInquiry(null);
+    const fieldErrors = validateInquiryForm({ customerName, customerEmail, destinationCountry, productId: selectedProduct, quantity });
+    setFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length > 0) return;
     const numericQuantity = Number(quantity);
-    if (customerName.trim().length < 2 || !customerEmail.includes("@") || destinationCountry.trim().length < 2 || !selectedProduct || !Number.isFinite(numericQuantity) || numericQuantity <= 0) {
-      setError("Lengkapi nama, email, negara tujuan, produk, dan jumlah dengan benar.");
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -123,6 +145,7 @@ export default function App() {
       setCustomerName("");
       setCustomerEmail("");
       setDestinationCountry("");
+      setFieldErrors({});
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Permintaan gagal dikirim.");
     } finally {
@@ -191,23 +214,24 @@ export default function App() {
             {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
             {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>Tidak ada produk yang cocok</Text><Text style={styles.emptyFilterCopy}>Coba ubah kata pencarian atau kategori.</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>Hapus filter</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
-              return <Pressable key={product.id} onPress={() => setSelectedProduct(product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }}>
+              return <Pressable key={product.id} onPress={() => updateInquiryField("productId", product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }} accessibilityHint={fieldErrors.productId ? "Pilih produk untuk menghapus kesalahan." : undefined}>
                 <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
                 <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
                 <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
               </Pressable>;
             })}
           </>}
+          {fieldErrors.productId ? <Text style={{ color: colors.danger, fontSize: 10, lineHeight: 15, marginTop: 5 }} accessibilityRole="alert" accessibilityLiveRegion="polite">{fieldErrors.productId}</Text> : null}
           <Text style={styles.demoNote}>Katalog contoh untuk pengembangan awal.</Text>
         </View>
 
         <View style={styles.card}>
           <SectionTitle eyebrow="02 — RFQ">Ajukan penawaran</SectionTitle>
           <Text style={styles.cardIntro}>Data tersimpan di SQLite lokal. Jika peer sync dikonfigurasi, kode ini dapat dilacak dari web atau desktop.</Text>
-          <Field label="Nama lengkap" value={customerName} onChangeText={setCustomerName} placeholder="Nama Anda" />
-          <Field label="Email kerja" value={customerEmail} onChangeText={setCustomerEmail} placeholder="nama@perusahaan.com" keyboardType="email-address" autoCapitalize="none" />
-          <Field label="Negara tujuan" value={destinationCountry} onChangeText={setDestinationCountry} placeholder="Contoh: Jepang" />
-          <Field label="Jumlah (kg)" value={quantity} onChangeText={setQuantity} placeholder="1000" keyboardType="numeric" />
+          <Field label="Nama lengkap" value={customerName} onChangeText={(value) => updateInquiryField("customerName", value)} placeholder="Nama Anda" error={fieldErrors.customerName} />
+          <Field label="Email kerja" value={customerEmail} onChangeText={(value) => updateInquiryField("customerEmail", value)} placeholder="nama@perusahaan.com" error={fieldErrors.customerEmail} keyboardType="email-address" autoCapitalize="none" />
+          <Field label="Negara tujuan" value={destinationCountry} onChangeText={(value) => updateInquiryField("destinationCountry", value)} placeholder="Contoh: Jepang" error={fieldErrors.destinationCountry} />
+          <Field label="Jumlah (kg)" value={quantity} onChangeText={(value) => updateInquiryField("quantity", value)} placeholder="1000" error={fieldErrors.quantity} keyboardType="decimal-pad" />
           <Pressable style={[styles.primaryButton, (submitting || loading || products.length === 0) && styles.disabledButton]} onPress={() => void submit()} disabled={submitting || loading || products.length === 0} accessibilityRole="button">
             {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Kirim permintaan <Text style={styles.buttonArrow}>↗</Text></Text>}
           </Pressable>
