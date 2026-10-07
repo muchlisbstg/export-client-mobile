@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterProducts, getCategories, normalizeCatalogText } from "../src/catalog-filter.ts";
+import { filterProducts, getCategories, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
 
 const products = [
   { id: "coffee", name: "Kopi Arabika", category: "Minuman", origin: "Jawa Barat", unit: "kg" },
@@ -56,4 +56,29 @@ test("clearing filters reveals the selected product without changing its id", ()
   const shown = filterProducts(products, "", "");
   assert.equal(shown.some((p) => p.id === selectedProduct), true);
   assert.equal(selectedProduct, "coffee");
+});
+
+const sortableProducts = [
+  { id: "zulu", name: "Zebra", category: "Rempah", origin: "Zambia", unit: "kg" },
+  { id: "name-two-a", name: "Produk 2", category: "Minuman", origin: "Bali", unit: "bag" },
+  { id: "name-two-b", name: "Produk 2", category: "Minuman", origin: "Bali", unit: "box" },
+  { id: "name-ten", name: "Produk 10", category: "Bahan", origin: "Jakarta", unit: "g" },
+];
+
+test("local sorting supports each existing catalog field with Indonesian natural ordering", () => {
+  assert.deepEqual(sortProducts(sortableProducts, "name").map((p) => p.id), ["name-two-a", "name-two-b", "name-ten", "zulu"]);
+  assert.deepEqual(sortProducts(sortableProducts, "category").map((p) => p.id), ["name-ten", "name-two-a", "name-two-b", "zulu"]);
+  assert.deepEqual(sortProducts(sortableProducts, "origin").map((p) => p.id), ["name-two-a", "name-two-b", "name-ten", "zulu"]);
+  assert.deepEqual(sortProducts(sortableProducts, "unit").map((p) => p.id), ["name-two-a", "name-two-b", "name-ten", "zulu"]);
+});
+
+test("descending sorting is stable for ties and sorting a filtered list leaves source order unchanged", () => {
+  const originalOrder = sortableProducts.map((p) => p.id);
+  const descending = sortProducts(sortableProducts, "name", "desc");
+  assert.deepEqual(descending.map((p) => p.id), ["zulu", "name-ten", "name-two-a", "name-two-b"]);
+  const filteredSorted = sortProducts(filterProducts(sortableProducts, "produk"), "name", "desc");
+  assert.deepEqual(filteredSorted.map((p) => p.id), ["name-ten", "name-two-a", "name-two-b"]);
+  assert.deepEqual(sortProducts(sortableProducts, "default").map((p) => p.id), originalOrder);
+  assert.notStrictEqual(sortProducts(sortableProducts, "default"), sortableProducts);
+  assert.deepEqual(sortableProducts.map((p) => p.id), originalOrder);
 });
