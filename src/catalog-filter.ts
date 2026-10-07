@@ -9,6 +9,17 @@ export function normalizeCatalogText(value: string): string {
     .trim();
 }
 
+export type CatalogSortField = "default" | "name" | "category" | "origin" | "unit";
+export type CatalogSortDirection = "asc" | "desc";
+
+export const catalogSortOptions: ReadonlyArray<{ field: CatalogSortField; label: string }> = [
+  { field: "default", label: "Urutan awal" },
+  { field: "name", label: "Nama" },
+  { field: "category", label: "Kategori" },
+  { field: "origin", label: "Asal" },
+  { field: "unit", label: "Satuan" },
+];
+
 /** Return non-empty categories actually present in the received catalog, sorted for Indonesia. */
 export function getCategories(products: readonly Product[]): string[] {
   const categories = new Set(products.map((product) => product.category).filter(Boolean));
@@ -23,4 +34,23 @@ export function filterProducts(products: readonly Product[], query = "", categor
     const matchesCategory = !category || product.category === category;
     return matchesQuery && matchesCategory;
   });
+}
+
+/** Sort a copy of the currently loaded catalog; equal values retain their input order. */
+export function sortProducts<T extends Product>(
+  products: readonly T[],
+  field: CatalogSortField = "default",
+  direction: CatalogSortDirection = "asc",
+): T[] {
+  if (field === "default") return [...products];
+
+  const collator = new Intl.Collator("id-ID", { sensitivity: "base", numeric: true });
+  const multiplier = direction === "asc" ? 1 : -1;
+  return products
+    .map((product, index) => ({ product, index }))
+    .sort((a, b) => {
+      const result = collator.compare(String(a.product[field] ?? "").trim(), String(b.product[field] ?? "").trim());
+      return result === 0 ? a.index - b.index : result * multiplier;
+    })
+    .map(({ product }) => product);
 }

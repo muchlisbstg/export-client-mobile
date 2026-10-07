@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
-import { filterProducts, getCategories } from "./src/catalog-filter";
+import { catalogSortOptions, filterProducts, getCategories, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
@@ -64,6 +64,8 @@ export default function App() {
   const [trackedInquiry, setTrackedInquiry] = useState<InquiryStatus | null>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("");
+  const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
+  const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const catalogSearchRef = useRef<TextInput>(null);
 
   async function loadProducts() {
@@ -85,7 +87,7 @@ export default function App() {
   }, []);
 
   const categories = getCategories(products);
-  const visibleProducts = filterProducts(products, catalogQuery, catalogCategory);
+  const visibleProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory), catalogSortField, catalogSortDirection);
   const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
@@ -173,6 +175,11 @@ export default function App() {
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled">
               <Pressable onPress={() => setCatalogCategory("")} style={[styles.categoryChip, !catalogCategory && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogCategory }}><Text style={[styles.categoryChipText, !catalogCategory && styles.categoryChipTextSelected]}>Semua</Text></Pressable>
               {categories.map((category) => <Pressable key={category} onPress={() => setCatalogCategory(category)} style={[styles.categoryChip, catalogCategory === category && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogCategory === category }}><Text style={[styles.categoryChipText, catalogCategory === category && styles.categoryChipTextSelected]}>{category}</Text></Pressable>)}
+            </ScrollView>
+            <Text style={styles.label}>Urutkan</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Urutkan produk">
+              {catalogSortOptions.map(({ field, label }) => <Pressable key={field} onPress={() => { setCatalogSortField(field); setCatalogSortDirection("asc"); }} style={[styles.categoryChip, catalogSortField === field && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Urutkan berdasarkan ${label}`} accessibilityState={{ selected: catalogSortField === field }}><Text style={[styles.categoryChipText, catalogSortField === field && styles.categoryChipTextSelected]}>{label}</Text></Pressable>)}
+              {catalogSortField !== "default" ? <Pressable onPress={() => setCatalogSortDirection((direction) => direction === "asc" ? "desc" : "asc")} style={[styles.categoryChip, catalogSortDirection === "desc" && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Urutan ${catalogSortDirection === "asc" ? "A sampai Z" : "Z sampai A"}; ubah ke ${catalogSortDirection === "asc" ? "Z sampai A" : "A sampai Z"}`} accessibilityState={{ selected: catalogSortDirection === "desc" }}><Text style={[styles.categoryChipText, catalogSortDirection === "desc" && styles.categoryChipTextSelected]}>{catalogSortDirection === "asc" ? "A–Z" : "Z–A"}</Text></Pressable> : null}
             </ScrollView>
             <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
             {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
