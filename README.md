@@ -56,4 +56,6 @@ npx expo export --platform android
 
 Tes backend memakai database sementara dan mencakup health, katalog, create/track, sync disabled, autentikasi, replikasi idempotent, serta conflict non-overwrite. Tes API client tetap dijalankan dalam suite yang sama. Perintah export Android adalah compatibility check dan tidak melakukan deployment.
 
+CI Mobile juga menjalankan tes interoperabilitas terhadap backend Web dan Desktop. Untuk cara menjalankan harness tiga repo secara lokal serta daftar pemeriksaan duplikat, konflik payload, dan benturan tracking-code, lihat [runbook pengujian interoperabilitas](https://github.com/muchlisbstg/export-client-web-sync/blob/main/docs/interop-testing.md). Tes tersebut memakai data sintetis dan SQLite sementara, bukan database aplikasi.
+
 Tidak ada login/admin, edit status, retensi, penghapusan, deployment, atau koneksi ke data klien nyata dalam MVP ini.
