@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
 import { catalogSortOptions, filterProducts, getCategories, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
-import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
+import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
@@ -101,6 +101,7 @@ export default function App() {
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
   const comparedProducts = products.filter((product) => compareProductIds.includes(product.id));
+  const differingComparisonFields = getDifferingComparisonFields(comparedProducts);
 
   function toggleCompare(productId: string) {
     setCompareProductIds((current) => toggleCompareSelection(current, productId));
@@ -237,7 +238,7 @@ export default function App() {
                 <View style={compareStyles.labels}><View style={compareStyles.headerCell}><Text style={compareStyles.headerText}>Detail</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Kategori</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Asal</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Satuan</Text></View></View>
                 {comparedProducts.map((item) => <View key={item.id} style={compareStyles.column}>
                   <View style={compareStyles.headerCell}><Text style={compareStyles.headerText} numberOfLines={2}>{item.name}</Text><Pressable onPress={() => toggleCompare(item.id)} accessibilityRole="button" accessibilityLabel={`Hapus ${item.name} dari perbandingan`}><Text style={compareStyles.remove}>×</Text></Pressable></View>
-                  <View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.category}</Text></View><View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.origin}</Text></View><View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.unit}</Text></View>
+                  <View style={[compareStyles.cell, differingComparisonFields.includes("category") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("category") && compareStyles.differentValue]}>{differingComparisonFields.includes("category") ? "Berbeda · " : ""}{item.category}</Text></View><View style={[compareStyles.cell, differingComparisonFields.includes("origin") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("origin") && compareStyles.differentValue]}>{differingComparisonFields.includes("origin") ? "Berbeda · " : ""}{item.origin}</Text></View><View style={[compareStyles.cell, differingComparisonFields.includes("unit") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("unit") && compareStyles.differentValue]}>{differingComparisonFields.includes("unit") ? "Berbeda · " : ""}{item.unit}</Text></View>
                 </View>)}
               </ScrollView>}
             </View> : null}
@@ -323,6 +324,8 @@ const compareStyles = StyleSheet.create({
   headerText: { flex: 1, color: "#355143", fontSize: 9, lineHeight: 13, fontWeight: "800" },
   remove: { color: "#87948a", fontSize: 17, lineHeight: 18 },
   cell: { minHeight: 36, justifyContent: "center", paddingHorizontal: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: "#edf0eb" },
+  differentCell: { backgroundColor: "#f4f7ed" },
   labelText: { color: "#7b887f", fontSize: 9, fontWeight: "700" },
   valueText: { color: "#40584a", fontSize: 9, lineHeight: 13 },
+  differentValue: { color: "#294b39", fontWeight: "700" },
 });
