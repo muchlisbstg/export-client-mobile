@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
 import { catalogSortOptions, filterProducts, getCategories, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
@@ -72,6 +73,7 @@ export default function App() {
   const [catalogCategory, setCatalogCategory] = useState("");
   const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
+  const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
   const catalogSearchRef = useRef<TextInput>(null);
 
   async function loadProducts() {
@@ -98,6 +100,11 @@ export default function App() {
   const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
+  const comparedProducts = products.filter((product) => compareProductIds.includes(product.id));
+
+  function toggleCompare(productId: string) {
+    setCompareProductIds((current) => toggleCompareSelection(current, productId));
+  }
 
   function resetCatalogFilters() {
     setCatalogQuery("");
@@ -210,16 +217,30 @@ export default function App() {
               {catalogSortOptions.map(({ field, label }) => <Pressable key={field} onPress={() => { setCatalogSortField(field); setCatalogSortDirection("asc"); }} style={[styles.categoryChip, catalogSortField === field && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Urutkan berdasarkan ${label}`} accessibilityState={{ selected: catalogSortField === field }}><Text style={[styles.categoryChipText, catalogSortField === field && styles.categoryChipTextSelected]}>{label}</Text></Pressable>)}
               {catalogSortField !== "default" ? <Pressable onPress={() => setCatalogSortDirection((direction) => direction === "asc" ? "desc" : "asc")} style={[styles.categoryChip, catalogSortDirection === "desc" && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Urutan ${catalogSortDirection === "asc" ? "A sampai Z" : "Z sampai A"}; ubah ke ${catalogSortDirection === "asc" ? "Z sampai A" : "A sampai Z"}`} accessibilityState={{ selected: catalogSortDirection === "desc" }}><Text style={[styles.categoryChipText, catalogSortDirection === "desc" && styles.categoryChipTextSelected]}>{catalogSortDirection === "asc" ? "A–Z" : "Z–A"}</Text></Pressable> : null}
             </ScrollView>
-            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
+            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text><Text style={compareStyles.count} accessibilityRole="text" accessibilityLiveRegion="polite">Pembanding: {comparedProducts.length}/{MAX_COMPARE_PRODUCTS}</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
             {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
             {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>Tidak ada produk yang cocok</Text><Text style={styles.emptyFilterCopy}>Coba ubah kata pencarian atau kategori.</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>Hapus filter</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
-              return <Pressable key={product.id} onPress={() => updateInquiryField("productId", product.id)} style={[styles.productRow, selectedProduct === product.id && styles.productSelected]} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }} accessibilityHint={fieldErrors.productId ? "Pilih produk untuk menghapus kesalahan." : undefined}>
-                <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
-                <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
-                <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
-              </Pressable>;
+              const isCompared = compareProductIds.includes(product.id);
+              return <View key={product.id} style={[styles.productRow, compareStyles.productRow, selectedProduct === product.id && styles.productSelected]}>
+                <Pressable onPress={() => updateInquiryField("productId", product.id)} style={compareStyles.productMain} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }} accessibilityHint={fieldErrors.productId ? "Pilih produk untuk menghapus kesalahan." : undefined}>
+                  <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
+                  <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
+                  <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
+                </Pressable>
+                <View style={compareStyles.productActions}><Pressable onPress={() => toggleCompare(product.id)} disabled={!isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS} style={[compareStyles.toggle, isCompared && compareStyles.toggleSelected, !isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS && compareStyles.toggleDisabled]} accessibilityRole="button" accessibilityLabel={`${isCompared ? "Hapus dari" : "Tambah ke"} perbandingan: ${product.name}`} accessibilityState={{ selected: isCompared, disabled: !isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS }}><Text style={[compareStyles.toggleText, isCompared && compareStyles.toggleSelectedText]}>{isCompared ? "✓ Ditambahkan" : "Bandingkan"}</Text></Pressable></View>
+              </View>;
             })}
+            {compareProductIds.length > 0 ? <View style={compareStyles.panel} accessibilityLabel="Perbandingan produk">
+              <View style={compareStyles.heading}><View style={compareStyles.headingCopy}><Text style={compareStyles.title}>Perbandingan produk</Text><Text style={compareStyles.subtitle} accessibilityRole="text" accessibilityLiveRegion="polite">{comparedProducts.length} dari {MAX_COMPARE_PRODUCTS} dipilih · atribut dari katalog API</Text></View><Pressable onPress={() => setCompareProductIds([])} accessibilityRole="button"><Text style={compareStyles.clear}>Hapus semua</Text></Pressable></View>
+              {comparedProducts.length < 2 ? <Text style={compareStyles.hint}>Pilih setidaknya satu produk lagi untuk membandingkan detail.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={compareStyles.table} accessibilityLabel="Detail perbandingan produk">
+                <View style={compareStyles.labels}><View style={compareStyles.headerCell}><Text style={compareStyles.headerText}>Detail</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Kategori</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Asal</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Satuan</Text></View></View>
+                {comparedProducts.map((item) => <View key={item.id} style={compareStyles.column}>
+                  <View style={compareStyles.headerCell}><Text style={compareStyles.headerText} numberOfLines={2}>{item.name}</Text><Pressable onPress={() => toggleCompare(item.id)} accessibilityRole="button" accessibilityLabel={`Hapus ${item.name} dari perbandingan`}><Text style={compareStyles.remove}>×</Text></Pressable></View>
+                  <View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.category}</Text></View><View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.origin}</Text></View><View style={compareStyles.cell}><Text style={compareStyles.valueText}>{item.unit}</Text></View>
+                </View>)}
+              </ScrollView>}
+            </View> : null}
           </>}
           {fieldErrors.productId ? <Text style={{ color: colors.danger, fontSize: 10, lineHeight: 15, marginTop: 5 }} accessibilityRole="alert" accessibilityLiveRegion="polite">{fieldErrors.productId}</Text> : null}
           <Text style={styles.demoNote}>Katalog contoh untuk pengembangan awal.</Text>
@@ -276,4 +297,32 @@ const styles = StyleSheet.create({
   loader: { paddingVertical: 20 }, mutedText: { color: colors.muted, fontSize: 12 }, searchWrap: { position: "relative", justifyContent: "center", marginBottom: 10 }, searchInput: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingRight: 40, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, clearButton: { position: "absolute", right: 8, width: 30, height: 30, alignItems: "center", justifyContent: "center" }, clearButtonText: { color: colors.muted, fontSize: 23, lineHeight: 25 }, categoryChips: { gap: 7, paddingBottom: 11, paddingRight: 14 }, categoryChip: { borderWidth: 1, borderColor: colors.line, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: colors.white }, categoryChipSelected: { backgroundColor: colors.green, borderColor: colors.green }, categoryChipText: { color: colors.muted, fontSize: 10, fontWeight: "700" }, categoryChipTextSelected: { color: colors.white }, resultHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }, resultCount: { color: colors.muted, fontSize: 10, fontWeight: "700" }, resetText: { color: colors.green, fontSize: 10, fontWeight: "800" }, selectedHidden: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, backgroundColor: "#f3f6ed", borderLeftWidth: 3, borderLeftColor: colors.sage, padding: 10, marginVertical: 8 }, selectedHiddenText: { color: colors.ink, fontSize: 10, flex: 1 }, showSelectedText: { color: colors.green, fontSize: 10, fontWeight: "800" }, emptyFilter: { alignItems: "center", paddingVertical: 22, paddingHorizontal: 8 }, emptyFilterTitle: { color: colors.ink, fontSize: 13, fontWeight: "800" }, emptyFilterCopy: { color: colors.muted, fontSize: 10, marginTop: 5 }, emptyAction: { marginTop: 12, paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: colors.green, borderRadius: 2 }, emptyActionText: { color: colors.green, fontSize: 10, fontWeight: "800" }, productRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 9, borderWidth: 1, borderColor: "transparent", borderRadius: 3, marginHorizontal: -9 }, productSelected: { backgroundColor: "#f3f6ed", borderColor: "#cbd8bc" }, productIcon: { width: 42, height: 42, borderRadius: 3, alignItems: "center", justifyContent: "center", backgroundColor: "#87956f" }, productIconAlt: { backgroundColor: "#8d9062" }, productIconThird: { backgroundColor: "#947653" }, productIconText: { color: colors.white, fontSize: 11, fontWeight: "700", letterSpacing: 1 }, productCopy: { flex: 1 }, productName: { color: colors.ink, fontSize: 12, fontWeight: "700" }, productMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, radio: { width: 17, height: 17, borderRadius: 9, borderWidth: 1, borderColor: "#b6c0b7", alignItems: "center", justifyContent: "center" }, radioSelected: { borderColor: colors.green }, radioInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.green }, demoNote: { color: "#89938d", fontSize: 9, marginTop: 9 },
   cardIntro: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: -3, marginBottom: 15 }, field: { marginBottom: 13 }, label: { color: "#40564c", fontSize: 10, fontWeight: "700", marginBottom: 6 }, input: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingVertical: 10, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, primaryButton: { minHeight: 46, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 3, borderRadius: 2 }, primaryButtonText: { color: colors.white, fontSize: 12, fontWeight: "700", width: "100%", paddingHorizontal: 14 }, buttonArrow: { fontSize: 17 }, disabledButton: { opacity: 0.55 }, successBox: { backgroundColor: "#edf2e4", borderLeftWidth: 3, borderLeftColor: "#85a456", padding: 12, marginTop: 13 }, successTitle: { color: "#435644", fontSize: 11, fontWeight: "700" }, successCopy: { color: "#647669", fontSize: 10, lineHeight: 15, marginTop: 4 }, code: { color: colors.green, fontSize: 14, fontWeight: "800", letterSpacing: 1.2, marginTop: 8 },
   trackCard: { backgroundColor: "#f1f3eb" }, secondaryButton: { minHeight: 43, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", borderRadius: 2 }, secondaryButtonText: { color: colors.green, fontSize: 11, fontWeight: "800" }, statusBox: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, marginTop: 12, backgroundColor: "#e8efdf" }, statusCopy: { flex: 1 }, statusTitle: { color: colors.green, fontSize: 11, fontWeight: "800", textTransform: "capitalize" }, statusMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, privacyNote: { color: "#858f88", fontSize: 9, lineHeight: 14, marginTop: 14 }, errorBox: { color: colors.danger, backgroundColor: "#fff0ee", borderWidth: 1, borderColor: "#f0d1cc", padding: 12, marginBottom: 13, fontSize: 11, lineHeight: 16 }, footer: { color: "#8b968f", fontSize: 9, textAlign: "center", marginTop: 7 }
+});
+
+const compareStyles = StyleSheet.create({
+  count: { color: "#718078", fontSize: 9, fontWeight: "700" },
+  productRow: { flexDirection: "column", alignItems: "stretch", gap: 5 },
+  productMain: { flexDirection: "row", alignItems: "center", gap: 12 },
+  productActions: { flexDirection: "row", justifyContent: "flex-end" },
+  toggle: { minHeight: 29, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.line, borderRadius: 3, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
+  toggleSelected: { borderColor: "#cbd8bc", backgroundColor: "#edf2e8" },
+  toggleDisabled: { opacity: 0.55 },
+  toggleText: { color: "#486344", fontSize: 9, fontWeight: "700" },
+  toggleSelectedText: { color: "#31543e" },
+  panel: { marginTop: 14, padding: 12, borderWidth: 1, borderColor: "#e2e8df", borderRadius: 4, backgroundColor: colors.white },
+  heading: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 11 },
+  headingCopy: { flex: 1 },
+  title: { color: "#294b39", fontSize: 14, fontWeight: "800" },
+  subtitle: { color: "#7a8880", fontSize: 9, lineHeight: 14, marginTop: 4 },
+  clear: { color: "#577249", fontSize: 9, fontWeight: "800" },
+  hint: { padding: 11, backgroundColor: "#f7f9f4", color: "#6e7d71", fontSize: 9, lineHeight: 14 },
+  table: { alignItems: "stretch" },
+  labels: { width: 76 },
+  column: { width: 126, borderLeftWidth: 1, borderLeftColor: "#edf0eb" },
+  headerCell: { minHeight: 46, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 4, padding: 8, backgroundColor: "#f7f9f5", borderBottomWidth: 1, borderBottomColor: "#edf0eb" },
+  headerText: { flex: 1, color: "#355143", fontSize: 9, lineHeight: 13, fontWeight: "800" },
+  remove: { color: "#87948a", fontSize: 17, lineHeight: 18 },
+  cell: { minHeight: 36, justifyContent: "center", paddingHorizontal: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: "#edf0eb" },
+  labelText: { color: "#7b887f", fontSize: 9, fontWeight: "700" },
+  valueText: { color: "#40584a", fontSize: 9, lineHeight: 13 },
 });
