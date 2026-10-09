@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterProducts, getCategories, getOrigins, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
+import { filterProducts, getCategories, getFacetCounts, getOrigins, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
 import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "../src/catalog-compare.ts";
 
 const products = [
@@ -30,6 +30,13 @@ test("categories are dynamic, unique, non-empty, and Indonesian-locale sorted", 
 test("origins are dynamic, unique, non-empty, and Indonesian-locale sorted", () => {
   const input = [...products, { ...products[0], id: "coffee-2" }, { ...products[0], id: "coffee-3", origin: "Bali" }];
   assert.deepEqual(getOrigins(input), ["Bali", "Jawa Barat", "Maluku", "Sulawesi", "Sumatera"]);
+});
+
+test("facet counts reflect the other active filter", () => {
+  const categoriesForWestJava = getFacetCounts(filterProducts(products, "", "", "Jawa Barat"), "category");
+  assert.deepEqual([...categoriesForWestJava], [["Minuman", 1]]);
+  const originsForDrinks = getFacetCounts(filterProducts(products, "", "Minuman"), "origin");
+  assert.deepEqual([...originsForDrinks], [["Jawa Barat", 1], ["Sumatera", 1]]);
 });
 
 test("distinct API category values, including a category named all, remain filterable", () => {
