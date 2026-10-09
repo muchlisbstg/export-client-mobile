@@ -26,13 +26,19 @@ export function getCategories(products: readonly Product[]): string[] {
   return [...categories].sort((a, b) => a.localeCompare(b, "id-ID", { sensitivity: "base" }));
 }
 
-/** Filter without mutating the fetched catalog; text and category are combined with AND. */
-export function filterProducts(products: readonly Product[], query = "", category = ""): Product[] {
+export function getOrigins(products: readonly Product[]): string[] {
+  const origins = new Set(products.map((product) => product.origin).filter(Boolean));
+  return [...origins].sort((a, b) => a.localeCompare(b, "id-ID", { sensitivity: "base" }));
+}
+
+/** Filter without mutating the fetched catalog; text, category, and origin are combined with AND. */
+export function filterProducts(products: readonly Product[], query = "", category = "", origin = ""): Product[] {
   const normalizedQuery = normalizeCatalogText(query);
   return products.filter((product) => {
     const matchesQuery = !normalizedQuery || normalizeCatalogText(`${product.name} ${product.category} ${product.origin}`).includes(normalizedQuery);
     const matchesCategory = !category || product.category === category;
-    return matchesQuery && matchesCategory;
+    const matchesOrigin = !origin || product.origin === origin;
+    return matchesQuery && matchesCategory && matchesOrigin;
   });
 }
 

@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
-import { catalogSortOptions, filterProducts, getCategories, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { catalogSortOptions, filterProducts, getCategories, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 
@@ -71,6 +71,7 @@ export default function App() {
   const [trackedInquiry, setTrackedInquiry] = useState<InquiryStatus | null>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("");
+  const [catalogOrigin, setCatalogOrigin] = useState("");
   const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
@@ -96,8 +97,9 @@ export default function App() {
   }, []);
 
   const categories = getCategories(products);
-  const visibleProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory), catalogSortField, catalogSortDirection);
-  const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0;
+  const origins = getOrigins(products);
+  const visibleProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin), catalogSortField, catalogSortDirection);
+  const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0 || catalogOrigin.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
   const comparedProducts = products.filter((product) => compareProductIds.includes(product.id));
@@ -110,6 +112,7 @@ export default function App() {
   function resetCatalogFilters() {
     setCatalogQuery("");
     setCatalogCategory("");
+    setCatalogOrigin("");
     catalogSearchRef.current?.focus();
   }
 
@@ -212,6 +215,11 @@ export default function App() {
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled">
               <Pressable onPress={() => setCatalogCategory("")} style={[styles.categoryChip, !catalogCategory && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogCategory }}><Text style={[styles.categoryChipText, !catalogCategory && styles.categoryChipTextSelected]}>Semua</Text></Pressable>
               {categories.map((category) => <Pressable key={category} onPress={() => setCatalogCategory(category)} style={[styles.categoryChip, catalogCategory === category && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogCategory === category }}><Text style={[styles.categoryChipText, catalogCategory === category && styles.categoryChipTextSelected]}>{category}</Text></Pressable>)}
+            </ScrollView>
+            <Text style={styles.label}>Asal</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Filter berdasarkan asal">
+              <Pressable onPress={() => setCatalogOrigin("")} style={[styles.categoryChip, !catalogOrigin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogOrigin }}><Text style={[styles.categoryChipText, !catalogOrigin && styles.categoryChipTextSelected]}>Semua asal</Text></Pressable>
+              {origins.map((origin) => <Pressable key={origin} onPress={() => setCatalogOrigin(origin)} style={[styles.categoryChip, catalogOrigin === origin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogOrigin === origin }}><Text style={[styles.categoryChipText, catalogOrigin === origin && styles.categoryChipTextSelected]}>{origin}</Text></Pressable>)}
             </ScrollView>
             <Text style={styles.label}>Urutkan</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Urutkan produk">
