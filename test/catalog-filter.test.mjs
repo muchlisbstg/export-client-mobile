@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { filterProducts, getCategories, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
+import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "../src/catalog-compare.ts";
 
 const products = [
   { id: "coffee", name: "Kopi Arabika", category: "Minuman", origin: "Jawa Barat", unit: "kg" },
@@ -81,4 +82,17 @@ test("descending sorting is stable for ties and sorting a filtered list leaves s
   assert.deepEqual(sortProducts(sortableProducts, "default").map((p) => p.id), originalOrder);
   assert.notStrictEqual(sortProducts(sortableProducts, "default"), sortableProducts);
   assert.deepEqual(sortableProducts.map((p) => p.id), originalOrder);
+});
+
+test("comparison selection adds and removes products without mutating its source", () => {
+  const selected = ["coffee", "cocoa"];
+  assert.deepEqual(toggleCompareSelection(selected, "tea"), ["coffee", "cocoa", "tea"]);
+  assert.deepEqual(toggleCompareSelection(selected, "coffee"), ["cocoa"]);
+  assert.deepEqual(selected, ["coffee", "cocoa"]);
+});
+
+test("comparison selection is capped at three products and drops duplicate ids", () => {
+  assert.equal(MAX_COMPARE_PRODUCTS, 3);
+  assert.deepEqual(toggleCompareSelection(["coffee", "cocoa", "tea"], "spice"), ["coffee", "cocoa", "tea"]);
+  assert.deepEqual(toggleCompareSelection(["coffee", "coffee", ""], "tea"), ["coffee", "tea"]);
 });
