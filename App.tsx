@@ -13,11 +13,12 @@ import {
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
 import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
-import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
+import { getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
 import { filterOutComparedProducts } from "./src/catalog-compare";
 
+const comparisonFieldLabels: Record<ComparisonField, string> = { category: "Kategori", origin: "Asal", unit: "Satuan" };
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
 type FieldProps = {
@@ -79,6 +80,7 @@ export default function App() {
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
   const [hideComparedProducts, setHideComparedProducts] = useState(false);
+  const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
   const [catalogShareNotice, setCatalogShareNotice] = useState("");
   const catalogSearchRef = useRef<TextInput>(null);
 
@@ -116,6 +118,7 @@ export default function App() {
   const selectedProductHiddenByComparison = Boolean(hideComparedProducts && compareProductIds.includes(selectedProduct) && matchingProducts.some((product) => product.id === selectedProduct));
   const comparedProducts = products.filter((product) => compareProductIds.includes(product.id));
   const differingComparisonFields = getDifferingComparisonFields(comparedProducts);
+  const visibleComparisonFields = getComparisonFieldsToDisplay(comparedProducts, showOnlyDifferences);
 
   function toggleCompare(productId: string) {
     setCompareProductIds((current) => toggleCompareSelection(current, productId));
@@ -293,13 +296,19 @@ export default function App() {
             })}
             {compareProductIds.length > 0 ? <View style={compareStyles.panel} accessibilityLabel="Perbandingan produk">
               <View style={compareStyles.heading}><View style={compareStyles.headingCopy}><Text style={compareStyles.title}>Perbandingan produk</Text><Text style={compareStyles.subtitle} accessibilityRole="text" accessibilityLiveRegion="polite">{comparedProducts.length} dari {MAX_COMPARE_PRODUCTS} dipilih · atribut dari katalog API</Text></View><Pressable onPress={() => setCompareProductIds([])} accessibilityRole="button"><Text style={compareStyles.clear}>Hapus semua</Text></Pressable></View>
-              {comparedProducts.length < 2 ? <Text style={compareStyles.hint}>Pilih setidaknya satu produk lagi untuk membandingkan detail.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={compareStyles.table} accessibilityLabel="Detail perbandingan produk">
-                <View style={compareStyles.labels}><View style={compareStyles.headerCell}><Text style={compareStyles.headerText}>Detail</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Kategori</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Asal</Text></View><View style={compareStyles.cell}><Text style={compareStyles.labelText}>Satuan</Text></View></View>
-                {comparedProducts.map((item) => <View key={item.id} style={compareStyles.column}>
-                  <View style={compareStyles.headerCell}><Text style={compareStyles.headerText} numberOfLines={2}>{item.name}</Text><Pressable onPress={() => toggleCompare(item.id)} accessibilityRole="button" accessibilityLabel={`Hapus ${item.name} dari perbandingan`}><Text style={compareStyles.remove}>×</Text></Pressable></View>
-                  <View style={[compareStyles.cell, differingComparisonFields.includes("category") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("category") && compareStyles.differentValue]}>{differingComparisonFields.includes("category") ? "Berbeda · " : ""}{item.category}</Text></View><View style={[compareStyles.cell, differingComparisonFields.includes("origin") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("origin") && compareStyles.differentValue]}>{differingComparisonFields.includes("origin") ? "Berbeda · " : ""}{item.origin}</Text></View><View style={[compareStyles.cell, differingComparisonFields.includes("unit") && compareStyles.differentCell]}><Text style={[compareStyles.valueText, differingComparisonFields.includes("unit") && compareStyles.differentValue]}>{differingComparisonFields.includes("unit") ? "Berbeda · " : ""}{item.unit}</Text></View>
-                </View>)}
-              </ScrollView>}
+              {comparedProducts.length < 2 ? <Text style={compareStyles.hint}>Pilih setidaknya satu produk lagi untuk membandingkan detail.</Text> : <>
+                <Pressable onPress={() => setShowOnlyDifferences((current) => !current)} style={[compareStyles.filterToggle, showOnlyDifferences && compareStyles.filterToggleSelected]} accessibilityRole="button" accessibilityLabel={showOnlyDifferences ? "Tampilkan semua atribut" : "Tampilkan hanya atribut yang berbeda"} accessibilityState={{ selected: showOnlyDifferences }}><Text style={[compareStyles.filterToggleText, showOnlyDifferences && compareStyles.toggleSelectedText]}>{showOnlyDifferences ? "Tampilkan semua atribut" : "Hanya tampilkan perbedaan"}</Text></Pressable>
+                {showOnlyDifferences && visibleComparisonFields.length === 0 ? <Text style={compareStyles.hint} accessibilityRole="text" accessibilityLiveRegion="polite">Tidak ada atribut yang berbeda pada pilihan ini.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={compareStyles.table} accessibilityLabel="Detail perbandingan produk">
+                  <View style={compareStyles.labels}><View style={compareStyles.headerCell}><Text style={compareStyles.headerText}>Detail</Text></View>{visibleComparisonFields.map((field) => <View key={field} style={compareStyles.cell}><Text style={compareStyles.labelText}>{comparisonFieldLabels[field]}</Text></View>)}</View>
+                  {comparedProducts.map((item) => <View key={item.id} style={compareStyles.column}>
+                    <View style={compareStyles.headerCell}><Text style={compareStyles.headerText} numberOfLines={2}>{item.name}</Text><Pressable onPress={() => toggleCompare(item.id)} accessibilityRole="button" accessibilityLabel={`Hapus ${item.name} dari perbandingan`}><Text style={compareStyles.remove}>×</Text></Pressable></View>
+                    {visibleComparisonFields.map((field) => {
+                      const isDifferent = differingComparisonFields.includes(field);
+                      return <View key={field} style={[compareStyles.cell, isDifferent && compareStyles.differentCell]}><Text style={[compareStyles.valueText, isDifferent && compareStyles.differentValue]}>{isDifferent ? "Berbeda · " : ""}{item[field]}</Text></View>;
+                    })}
+                  </View>)}
+                </ScrollView>}
+              </>}
             </View> : null}
           </>}
           {fieldErrors.productId ? <Text style={{ color: colors.danger, fontSize: 10, lineHeight: 15, marginTop: 5 }} accessibilityRole="alert" accessibilityLiveRegion="polite">{fieldErrors.productId}</Text> : null}
@@ -391,6 +400,9 @@ const compareStyles = StyleSheet.create({
   title: { color: "#294b39", fontSize: 14, fontWeight: "800" },
   subtitle: { color: "#7a8880", fontSize: 9, lineHeight: 14, marginTop: 4 },
   clear: { color: "#577249", fontSize: 9, fontWeight: "800" },
+  filterToggle: { alignSelf: "flex-start", minHeight: 32, justifyContent: "center", paddingHorizontal: 10, marginBottom: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 18, backgroundColor: colors.white },
+  filterToggleSelected: { borderColor: "#cbd8bc", backgroundColor: "#edf2e8" },
+  filterToggleText: { color: "#486344", fontSize: 9, fontWeight: "700" },
   hint: { padding: 11, backgroundColor: "#f7f9f4", color: "#6e7d71", fontSize: 9, lineHeight: 14 },
   table: { alignItems: "stretch" },
   labels: { width: 76 },
