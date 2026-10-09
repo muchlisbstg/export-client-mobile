@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterProducts, getCategories, getFacetCounts, getOrigins, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
+import { filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
 import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "../src/catalog-compare.ts";
 
 const products = [
@@ -65,6 +65,15 @@ test("empty result is distinct and source input remains immutable", () => {
   assert.deepEqual(filterProducts(products, "does-not-exist"), []);
   assert.deepEqual(products, original);
   assert.notStrictEqual(filterProducts(products, "kopi"), products);
+});
+
+test("active filter summary trims search and preserves the search-category-origin order", () => {
+  assert.deepEqual(getActiveCatalogFilters("  kopi  ", "Minuman", "Jawa Barat"), [
+    { key: "search", value: "kopi" },
+    { key: "category", value: "Minuman" },
+    { key: "origin", value: "Jawa Barat" },
+  ]);
+  assert.deepEqual(getActiveCatalogFilters("   ", "", ""), []);
 });
 
 test("clearing filters reveals the selected product without changing its id", () => {
