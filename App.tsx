@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
 import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
-import { formatComparisonShare, getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
+import { formatComparisonCsv, formatComparisonShare, getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
 import { filterOutComparedProducts } from "./src/catalog-compare";
@@ -83,6 +83,7 @@ export default function App() {
   const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
   const [catalogShareNotice, setCatalogShareNotice] = useState("");
   const [comparisonShareNotice, setComparisonShareNotice] = useState("");
+  const [comparisonCsvNotice, setComparisonCsvNotice] = useState("");
   const catalogSearchRef = useRef<TextInput>(null);
 
   async function loadProducts() {
@@ -165,6 +166,17 @@ export default function App() {
       if (result.action === Share.sharedAction) setComparisonShareNotice("Ringkasan perbandingan siap dibagikan.");
     } catch (caught) {
       setComparisonShareNotice(caught instanceof Error ? caught.message : "Perbandingan tidak dapat dibagikan.");
+    }
+  }
+
+  async function shareComparisonCsv() {
+    try {
+      const csv = formatComparisonCsv(comparedProducts, visibleComparisonFields);
+      if (!csv) throw new Error("Pilih setidaknya dua produk untuk membagikan CSV perbandingan.");
+      const result = await Share.share({ title: "Perbandingan produk CSV", message: csv });
+      if (result.action === Share.sharedAction) setComparisonCsvNotice("CSV perbandingan siap dibagikan.");
+    } catch (caught) {
+      setComparisonCsvNotice(caught instanceof Error ? caught.message : "CSV perbandingan tidak dapat dibagikan.");
     }
   }
 
@@ -313,8 +325,10 @@ export default function App() {
                 <View style={compareStyles.actions}>
                   <Pressable onPress={() => setShowOnlyDifferences((current) => !current)} style={[compareStyles.filterToggle, showOnlyDifferences && compareStyles.filterToggleSelected]} accessibilityRole="button" accessibilityLabel={showOnlyDifferences ? "Tampilkan semua atribut" : "Tampilkan hanya atribut yang berbeda"} accessibilityState={{ selected: showOnlyDifferences }}><Text style={[compareStyles.filterToggleText, showOnlyDifferences && compareStyles.toggleSelectedText]}>{showOnlyDifferences ? "Tampilkan semua atribut" : "Hanya tampilkan perbedaan"}</Text></Pressable>
                   <Pressable onPress={() => void shareComparison()} style={compareStyles.shareButton} accessibilityRole="button" accessibilityLabel="Bagikan perbandingan produk"><Text style={compareStyles.shareButtonText}>Bagikan perbandingan</Text></Pressable>
+                  <Pressable onPress={() => void shareComparisonCsv()} style={compareStyles.shareButton} accessibilityRole="button" accessibilityLabel="Bagikan perbandingan produk sebagai CSV"><Text style={compareStyles.shareButtonText}>Bagikan CSV</Text></Pressable>
                 </View>
                 {comparisonShareNotice ? <Text style={compareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{comparisonShareNotice}</Text> : null}
+                {comparisonCsvNotice ? <Text style={compareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{comparisonCsvNotice}</Text> : null}
                 {showOnlyDifferences && visibleComparisonFields.length === 0 ? <Text style={compareStyles.hint} accessibilityRole="text" accessibilityLiveRegion="polite">Tidak ada atribut yang berbeda pada pilihan ini.</Text> : <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={compareStyles.table} accessibilityLabel="Detail perbandingan produk">
                   <View style={compareStyles.labels}><View style={compareStyles.headerCell}><Text style={compareStyles.headerText}>Detail</Text></View>{visibleComparisonFields.map((field) => <View key={field} style={compareStyles.cell}><Text style={compareStyles.labelText}>{comparisonFieldLabels[field]}</Text></View>)}</View>
                   {comparedProducts.map((item) => <View key={item.id} style={compareStyles.column}>
