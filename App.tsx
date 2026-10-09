@@ -16,6 +16,7 @@ import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategor
 import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
+import { filterOutComparedProducts } from "./src/catalog-compare";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
@@ -77,6 +78,7 @@ export default function App() {
   const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
+  const [hideComparedProducts, setHideComparedProducts] = useState(false);
   const [catalogShareNotice, setCatalogShareNotice] = useState("");
   const catalogSearchRef = useRef<TextInput>(null);
 
@@ -105,11 +107,13 @@ export default function App() {
   const originFacetProducts = filterProducts(products, catalogQuery, catalogCategory, "");
   const categoryFacetCounts = getFacetCounts(categoryFacetProducts, "category");
   const originFacetCounts = getFacetCounts(originFacetProducts, "origin");
-  const visibleProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin), catalogSortField, catalogSortDirection);
+  const matchingProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin), catalogSortField, catalogSortDirection);
+  const visibleProducts = hideComparedProducts ? filterOutComparedProducts(matchingProducts, compareProductIds) : matchingProducts;
   const activeCatalogFilters = getActiveCatalogFilters(catalogQuery, catalogCategory, catalogOrigin);
   const catalogFilterActive = activeCatalogFilters.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
+  const selectedProductHiddenByComparison = Boolean(hideComparedProducts && compareProductIds.includes(selectedProduct) && matchingProducts.some((product) => product.id === selectedProduct));
   const comparedProducts = products.filter((product) => compareProductIds.includes(product.id));
   const differingComparisonFields = getDifferingComparisonFields(comparedProducts);
 
@@ -265,16 +269,17 @@ export default function App() {
                 return <View key={filter.key} style={activeFilterStyles.chip}><Text numberOfLines={1} style={activeFilterStyles.value}>{label}: {filter.value}</Text><Pressable onPress={() => clearCatalogFilter(filter.key)} accessibilityRole="button" accessibilityLabel={`Hapus filter ${label.toLowerCase()}: ${filter.value}`}><Text style={activeFilterStyles.remove}>×</Text></Pressable></View>;
               })}
             </View> : null}
-            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
+            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {hideComparedProducts ? matchingProducts.length : products.length} {hideComparedProducts ? "hasil" : "produk"}</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
             <View style={shareStyles.row}>
               <Text style={compareStyles.count} accessibilityRole="text" accessibilityLiveRegion="polite">Pembanding: {comparedProducts.length}/{MAX_COMPARE_PRODUCTS}</Text>
+              <Pressable onPress={() => setHideComparedProducts((current) => !current)} disabled={comparedProducts.length === 0 && !hideComparedProducts} style={[shareStyles.filterButton, hideComparedProducts && shareStyles.filterButtonActive, comparedProducts.length === 0 && !hideComparedProducts && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel={hideComparedProducts ? "Tampilkan produk yang sudah dibandingkan" : "Sembunyikan produk yang sudah dibandingkan"} accessibilityState={{ selected: hideComparedProducts, disabled: comparedProducts.length === 0 && !hideComparedProducts }}><Text style={shareStyles.buttonText}>{hideComparedProducts ? "Tampilkan yang dibandingkan" : "Sembunyikan yang dibandingkan"}</Text></Pressable>
               <Pressable onPress={() => void shareCatalogResults()} disabled={visibleProducts.length === 0} style={[shareStyles.button, visibleProducts.length === 0 && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel="Bagikan hasil katalog" accessibilityState={{ disabled: visibleProducts.length === 0 }}>
                 <Text style={shareStyles.buttonText}>Bagikan hasil</Text>
               </Pressable>
             </View>
             {catalogShareNotice ? <Text style={shareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{catalogShareNotice}</Text> : null}
-            {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
-            {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>Tidak ada produk yang cocok</Text><Text style={styles.emptyFilterCopy}>Coba ubah kata pencarian atau kategori.</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>Hapus filter</Text></Pressable></View> : visibleProducts.map((product) => {
+            {selectedProductHidden || selectedProductHiddenByComparison ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={() => { if (selectedProductHiddenByComparison) setHideComparedProducts(false); else resetCatalogFilters(); }} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
+            {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>{hideComparedProducts && matchingProducts.length > 0 ? "Semua hasil sudah dibandingkan" : "Tidak ada produk yang cocok"}</Text><Text style={styles.emptyFilterCopy}>{hideComparedProducts && matchingProducts.length > 0 ? "Produk yang sudah dipilih untuk perbandingan disembunyikan." : "Coba ubah kata pencarian atau kategori."}</Text><Pressable onPress={() => hideComparedProducts && matchingProducts.length > 0 ? setHideComparedProducts(false) : resetCatalogFilters()} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>{hideComparedProducts && matchingProducts.length > 0 ? "Tampilkan semua hasil" : "Hapus filter"}</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
               const isCompared = compareProductIds.includes(product.id);
               return <View key={product.id} style={[styles.productRow, compareStyles.productRow, selectedProduct === product.id && styles.productSelected]}>
@@ -354,8 +359,10 @@ const styles = StyleSheet.create({
   trackCard: { backgroundColor: "#f1f3eb" }, secondaryButton: { minHeight: 43, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", borderRadius: 2 }, secondaryButtonText: { color: colors.green, fontSize: 11, fontWeight: "800" }, statusBox: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, marginTop: 12, backgroundColor: "#e8efdf" }, statusCopy: { flex: 1 }, statusTitle: { color: colors.green, fontSize: 11, fontWeight: "800", textTransform: "capitalize" }, statusMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, privacyNote: { color: "#858f88", fontSize: 9, lineHeight: 14, marginTop: 14 }, errorBox: { color: colors.danger, backgroundColor: "#fff0ee", borderWidth: 1, borderColor: "#f0d1cc", padding: 12, marginBottom: 13, fontSize: 11, lineHeight: 16 }, footer: { color: "#8b968f", fontSize: 9, textAlign: "center", marginTop: 7 }
 });
 const shareStyles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 },
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 },
   button: { minHeight: 32, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 3, backgroundColor: colors.white },
+  filterButton: { minHeight: 32, maxWidth: "100%", paddingHorizontal: 9, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 3, backgroundColor: colors.white },
+  filterButtonActive: { borderColor: "#cbd8bc", backgroundColor: "#edf2e8" },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: colors.green, fontSize: 10, fontWeight: "800" },
   notice: { color: colors.green, fontSize: 9, marginBottom: 8 },
