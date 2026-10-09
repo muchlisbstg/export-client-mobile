@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
-import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, getUnits, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { formatComparisonCsv, formatComparisonShare, getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
@@ -76,6 +76,7 @@ export default function App() {
   const [catalogQuery, setCatalogQuery] = useState("");
   const [catalogCategory, setCatalogCategory] = useState("");
   const [catalogOrigin, setCatalogOrigin] = useState("");
+  const [catalogUnit, setCatalogUnit] = useState("");
   const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
@@ -107,13 +108,16 @@ export default function App() {
 
   const categories = getCategories(products);
   const origins = getOrigins(products);
-  const categoryFacetProducts = filterProducts(products, catalogQuery, "", catalogOrigin);
-  const originFacetProducts = filterProducts(products, catalogQuery, catalogCategory, "");
+  const units = getUnits(products);
+  const categoryFacetProducts = filterProducts(products, catalogQuery, "", catalogOrigin, catalogUnit);
+  const originFacetProducts = filterProducts(products, catalogQuery, catalogCategory, "", catalogUnit);
+  const unitFacetProducts = filterProducts(products, catalogQuery, catalogCategory, catalogOrigin);
   const categoryFacetCounts = getFacetCounts(categoryFacetProducts, "category");
   const originFacetCounts = getFacetCounts(originFacetProducts, "origin");
-  const matchingProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin), catalogSortField, catalogSortDirection);
+  const unitFacetCounts = getFacetCounts(unitFacetProducts, "unit");
+  const matchingProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin, catalogUnit), catalogSortField, catalogSortDirection);
   const visibleProducts = hideComparedProducts ? filterOutComparedProducts(matchingProducts, compareProductIds) : matchingProducts;
-  const activeCatalogFilters = getActiveCatalogFilters(catalogQuery, catalogCategory, catalogOrigin);
+  const activeCatalogFilters = getActiveCatalogFilters(catalogQuery, catalogCategory, catalogOrigin, catalogUnit);
   const catalogFilterActive = activeCatalogFilters.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
   const selectedProductHidden = Boolean(selectedProductRecord && !visibleProducts.some((product) => product.id === selectedProduct));
@@ -130,13 +134,15 @@ export default function App() {
     setCatalogQuery("");
     setCatalogCategory("");
     setCatalogOrigin("");
+    setCatalogUnit("");
     catalogSearchRef.current?.focus();
   }
 
-  function clearCatalogFilter(key: "search" | "category" | "origin") {
+  function clearCatalogFilter(key: "search" | "category" | "origin" | "unit") {
     if (key === "search") setCatalogQuery("");
     else if (key === "category") setCatalogCategory("");
-    else setCatalogOrigin("");
+    else if (key === "origin") setCatalogOrigin("");
+    else setCatalogUnit("");
   }
 
   async function shareCatalogResults() {
@@ -147,6 +153,7 @@ export default function App() {
           query: catalogQuery,
           category: catalogCategory,
           origin: catalogOrigin,
+          unit: catalogUnit,
           sortField: catalogSortField,
           sortDirection: catalogSortDirection,
         }),
@@ -285,6 +292,11 @@ export default function App() {
               <Pressable onPress={() => setCatalogOrigin("")} style={[styles.categoryChip, !catalogOrigin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Semua asal, ${originFacetProducts.length} produk`} accessibilityState={{ selected: !catalogOrigin }}><Text style={[styles.categoryChipText, !catalogOrigin && styles.categoryChipTextSelected]}>Semua asal ({originFacetProducts.length})</Text></Pressable>
               {origins.map((origin) => <Pressable key={origin} onPress={() => setCatalogOrigin(origin)} style={[styles.categoryChip, catalogOrigin === origin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Asal ${origin}, ${originFacetCounts.get(origin) ?? 0} produk`} accessibilityState={{ selected: catalogOrigin === origin }}><Text style={[styles.categoryChipText, catalogOrigin === origin && styles.categoryChipTextSelected]}>{origin} ({originFacetCounts.get(origin) ?? 0})</Text></Pressable>)}
             </ScrollView>
+            <Text style={styles.label}>Satuan</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Filter berdasarkan satuan">
+              <Pressable onPress={() => setCatalogUnit("")} style={[styles.categoryChip, !catalogUnit && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Semua satuan, ${unitFacetProducts.length} produk`} accessibilityState={{ selected: !catalogUnit }}><Text style={[styles.categoryChipText, !catalogUnit && styles.categoryChipTextSelected]}>Semua satuan ({unitFacetProducts.length})</Text></Pressable>
+              {units.map((unit) => <Pressable key={unit} onPress={() => setCatalogUnit(unit)} style={[styles.categoryChip, catalogUnit === unit && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Satuan ${unit}, ${unitFacetCounts.get(unit) ?? 0} produk`} accessibilityState={{ selected: catalogUnit === unit }}><Text style={[styles.categoryChipText, catalogUnit === unit && styles.categoryChipTextSelected]}>{unit} ({unitFacetCounts.get(unit) ?? 0})</Text></Pressable>)}
+            </ScrollView>
             <Text style={styles.label}>Urutkan</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Urutkan produk">
               {catalogSortOptions.map(({ field, label }) => <Pressable key={field} onPress={() => { setCatalogSortField(field); setCatalogSortDirection("asc"); }} style={[styles.categoryChip, catalogSortField === field && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Urutkan berdasarkan ${label}`} accessibilityState={{ selected: catalogSortField === field }}><Text style={[styles.categoryChipText, catalogSortField === field && styles.categoryChipTextSelected]}>{label}</Text></Pressable>)}
@@ -293,7 +305,7 @@ export default function App() {
             {activeCatalogFilters.length > 0 ? <View style={activeFilterStyles.row} accessibilityLabel="Filter aktif">
               <Text style={activeFilterStyles.label}>Filter aktif</Text>
               {activeCatalogFilters.map((filter) => {
-                const label = filter.key === "search" ? "Pencarian" : filter.key === "category" ? "Kategori" : "Asal";
+                const label = filter.key === "search" ? "Pencarian" : filter.key === "category" ? "Kategori" : filter.key === "origin" ? "Asal" : "Satuan";
                 return <View key={filter.key} style={activeFilterStyles.chip}><Text numberOfLines={1} style={activeFilterStyles.value}>{label}: {filter.value}</Text><Pressable onPress={() => clearCatalogFilter(filter.key)} accessibilityRole="button" accessibilityLabel={`Hapus filter ${label.toLowerCase()}: ${filter.value}`}><Text style={activeFilterStyles.remove}>×</Text></Pressable></View>;
               })}
             </View> : null}
@@ -307,7 +319,7 @@ export default function App() {
             </View>
             {catalogShareNotice ? <Text style={shareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{catalogShareNotice}</Text> : null}
             {selectedProductHidden || selectedProductHiddenByComparison ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={() => { if (selectedProductHiddenByComparison) setHideComparedProducts(false); else resetCatalogFilters(); }} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
-            {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>{hideComparedProducts && matchingProducts.length > 0 ? "Semua hasil sudah dibandingkan" : "Tidak ada produk yang cocok"}</Text><Text style={styles.emptyFilterCopy}>{hideComparedProducts && matchingProducts.length > 0 ? "Produk yang sudah dipilih untuk perbandingan disembunyikan." : "Coba ubah kata pencarian atau kategori."}</Text><Pressable onPress={() => hideComparedProducts && matchingProducts.length > 0 ? setHideComparedProducts(false) : resetCatalogFilters()} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>{hideComparedProducts && matchingProducts.length > 0 ? "Tampilkan semua hasil" : "Hapus filter"}</Text></Pressable></View> : visibleProducts.map((product) => {
+            {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>{hideComparedProducts && matchingProducts.length > 0 ? "Semua hasil sudah dibandingkan" : "Tidak ada produk yang cocok"}</Text><Text style={styles.emptyFilterCopy}>{hideComparedProducts && matchingProducts.length > 0 ? "Produk yang sudah dipilih untuk perbandingan disembunyikan." : "Coba ubah pencarian, kategori, asal, atau satuan."}</Text><Pressable onPress={() => hideComparedProducts && matchingProducts.length > 0 ? setHideComparedProducts(false) : resetCatalogFilters()} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>{hideComparedProducts && matchingProducts.length > 0 ? "Tampilkan semua hasil" : "Hapus filter"}</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
               const isCompared = compareProductIds.includes(product.id);
               return <View key={product.id} style={[styles.productRow, compareStyles.productRow, selectedProduct === product.id && styles.productSelected]}>
