@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +15,7 @@ import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Prod
 import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
+import { formatCatalogShare } from "./src/catalog-share";
 
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
 
@@ -75,6 +77,7 @@ export default function App() {
   const [catalogSortField, setCatalogSortField] = useState<CatalogSortField>("default");
   const [catalogSortDirection, setCatalogSortDirection] = useState<CatalogSortDirection>("asc");
   const [compareProductIds, setCompareProductIds] = useState<string[]>([]);
+  const [catalogShareNotice, setCatalogShareNotice] = useState("");
   const catalogSearchRef = useRef<TextInput>(null);
 
   async function loadProducts() {
@@ -125,6 +128,24 @@ export default function App() {
     if (key === "search") setCatalogQuery("");
     else if (key === "category") setCatalogCategory("");
     else setCatalogOrigin("");
+  }
+
+  async function shareCatalogResults() {
+    try {
+      const result = await Share.share({
+        title: "Katalog ekspor",
+        message: formatCatalogShare(visibleProducts, {
+          query: catalogQuery,
+          category: catalogCategory,
+          origin: catalogOrigin,
+          sortField: catalogSortField,
+          sortDirection: catalogSortDirection,
+        }),
+      });
+      if (result.action === Share.sharedAction) setCatalogShareNotice("Daftar katalog siap dibagikan.");
+    } catch (caught) {
+      setCatalogShareNotice(caught instanceof Error ? caught.message : "Daftar katalog tidak dapat dibagikan.");
+    }
   }
 
   function updateInquiryField(field: InquiryField, value: string) {
@@ -244,7 +265,14 @@ export default function App() {
                 return <View key={filter.key} style={activeFilterStyles.chip}><Text numberOfLines={1} style={activeFilterStyles.value}>{label}: {filter.value}</Text><Pressable onPress={() => clearCatalogFilter(filter.key)} accessibilityRole="button" accessibilityLabel={`Hapus filter ${label.toLowerCase()}: ${filter.value}`}><Text style={activeFilterStyles.remove}>×</Text></Pressable></View>;
               })}
             </View> : null}
-            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text><Text style={compareStyles.count} accessibilityRole="text" accessibilityLiveRegion="polite">Pembanding: {comparedProducts.length}/{MAX_COMPARE_PRODUCTS}</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
+            <View style={styles.resultHeader}><Text style={styles.resultCount} accessibilityRole="text" accessibilityLiveRegion="polite">{visibleProducts.length} dari {products.length} produk</Text>{catalogFilterActive ? <Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.resetText}>Reset filter</Text></Pressable> : null}</View>
+            <View style={shareStyles.row}>
+              <Text style={compareStyles.count} accessibilityRole="text" accessibilityLiveRegion="polite">Pembanding: {comparedProducts.length}/{MAX_COMPARE_PRODUCTS}</Text>
+              <Pressable onPress={() => void shareCatalogResults()} disabled={visibleProducts.length === 0} style={[shareStyles.button, visibleProducts.length === 0 && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel="Bagikan hasil katalog" accessibilityState={{ disabled: visibleProducts.length === 0 }}>
+                <Text style={shareStyles.buttonText}>Bagikan hasil</Text>
+              </Pressable>
+            </View>
+            {catalogShareNotice ? <Text style={shareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{catalogShareNotice}</Text> : null}
             {selectedProductHidden ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
             {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>Tidak ada produk yang cocok</Text><Text style={styles.emptyFilterCopy}>Coba ubah kata pencarian atau kategori.</Text><Pressable onPress={resetCatalogFilters} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>Hapus filter</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
@@ -325,7 +353,13 @@ const styles = StyleSheet.create({
   cardIntro: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: -3, marginBottom: 15 }, field: { marginBottom: 13 }, label: { color: "#40564c", fontSize: 10, fontWeight: "700", marginBottom: 6 }, input: { minHeight: 44, borderWidth: 1, borderColor: colors.line, borderRadius: 2, paddingHorizontal: 11, paddingVertical: 10, color: colors.ink, backgroundColor: colors.white, fontSize: 12 }, primaryButton: { minHeight: 46, backgroundColor: colors.green, alignItems: "center", justifyContent: "center", marginTop: 3, borderRadius: 2 }, primaryButtonText: { color: colors.white, fontSize: 12, fontWeight: "700", width: "100%", paddingHorizontal: 14 }, buttonArrow: { fontSize: 17 }, disabledButton: { opacity: 0.55 }, successBox: { backgroundColor: "#edf2e4", borderLeftWidth: 3, borderLeftColor: "#85a456", padding: 12, marginTop: 13 }, successTitle: { color: "#435644", fontSize: 11, fontWeight: "700" }, successCopy: { color: "#647669", fontSize: 10, lineHeight: 15, marginTop: 4 }, code: { color: colors.green, fontSize: 14, fontWeight: "800", letterSpacing: 1.2, marginTop: 8 },
   trackCard: { backgroundColor: "#f1f3eb" }, secondaryButton: { minHeight: 43, backgroundColor: colors.lime, alignItems: "center", justifyContent: "center", borderRadius: 2 }, secondaryButtonText: { color: colors.green, fontSize: 11, fontWeight: "800" }, statusBox: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, marginTop: 12, backgroundColor: "#e8efdf" }, statusCopy: { flex: 1 }, statusTitle: { color: colors.green, fontSize: 11, fontWeight: "800", textTransform: "capitalize" }, statusMeta: { color: colors.muted, fontSize: 9, marginTop: 4 }, privacyNote: { color: "#858f88", fontSize: 9, lineHeight: 14, marginTop: 14 }, errorBox: { color: colors.danger, backgroundColor: "#fff0ee", borderWidth: 1, borderColor: "#f0d1cc", padding: 12, marginBottom: 13, fontSize: 11, lineHeight: 16 }, footer: { color: "#8b968f", fontSize: 9, textAlign: "center", marginTop: 7 }
 });
-
+const shareStyles = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 },
+  button: { minHeight: 32, paddingHorizontal: 11, paddingVertical: 8, borderWidth: 1, borderColor: colors.line, borderRadius: 3, backgroundColor: colors.white },
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { color: colors.green, fontSize: 10, fontWeight: "800" },
+  notice: { color: colors.green, fontSize: 9, marginBottom: 8 },
+});
 const activeFilterStyles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 9 },
   label: { color: colors.muted, fontSize: 9, fontWeight: "800", marginRight: 2 },
