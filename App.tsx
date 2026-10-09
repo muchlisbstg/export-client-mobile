@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
-import { catalogSortOptions, filterProducts, getCategories, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { catalogSortOptions, filterProducts, getCategories, getFacetCounts, getOrigins, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 
@@ -98,6 +98,10 @@ export default function App() {
 
   const categories = getCategories(products);
   const origins = getOrigins(products);
+  const categoryFacetProducts = filterProducts(products, catalogQuery, "", catalogOrigin);
+  const originFacetProducts = filterProducts(products, catalogQuery, catalogCategory, "");
+  const categoryFacetCounts = getFacetCounts(categoryFacetProducts, "category");
+  const originFacetCounts = getFacetCounts(originFacetProducts, "origin");
   const visibleProducts = sortProducts(filterProducts(products, catalogQuery, catalogCategory, catalogOrigin), catalogSortField, catalogSortDirection);
   const catalogFilterActive = catalogQuery.trim().length > 0 || catalogCategory.length > 0 || catalogOrigin.length > 0;
   const selectedProductRecord = products.find((product) => product.id === selectedProduct);
@@ -213,13 +217,13 @@ export default function App() {
               {catalogQuery.length > 0 ? <Pressable onPress={() => setCatalogQuery("")} style={styles.clearButton} accessibilityRole="button" accessibilityLabel="Bersihkan pencarian"><Text style={styles.clearButtonText}>×</Text></Pressable> : null}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled">
-              <Pressable onPress={() => setCatalogCategory("")} style={[styles.categoryChip, !catalogCategory && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogCategory }}><Text style={[styles.categoryChipText, !catalogCategory && styles.categoryChipTextSelected]}>Semua</Text></Pressable>
-              {categories.map((category) => <Pressable key={category} onPress={() => setCatalogCategory(category)} style={[styles.categoryChip, catalogCategory === category && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogCategory === category }}><Text style={[styles.categoryChipText, catalogCategory === category && styles.categoryChipTextSelected]}>{category}</Text></Pressable>)}
+              <Pressable onPress={() => setCatalogCategory("")} style={[styles.categoryChip, !catalogCategory && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Semua kategori, ${categoryFacetProducts.length} produk`} accessibilityState={{ selected: !catalogCategory }}><Text style={[styles.categoryChipText, !catalogCategory && styles.categoryChipTextSelected]}>Semua ({categoryFacetProducts.length})</Text></Pressable>
+              {categories.map((category) => <Pressable key={category} onPress={() => setCatalogCategory(category)} style={[styles.categoryChip, catalogCategory === category && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Kategori ${category}, ${categoryFacetCounts.get(category) ?? 0} produk`} accessibilityState={{ selected: catalogCategory === category }}><Text style={[styles.categoryChipText, catalogCategory === category && styles.categoryChipTextSelected]}>{category} ({categoryFacetCounts.get(category) ?? 0})</Text></Pressable>)}
             </ScrollView>
             <Text style={styles.label}>Asal</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Filter berdasarkan asal">
-              <Pressable onPress={() => setCatalogOrigin("")} style={[styles.categoryChip, !catalogOrigin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: !catalogOrigin }}><Text style={[styles.categoryChipText, !catalogOrigin && styles.categoryChipTextSelected]}>Semua asal</Text></Pressable>
-              {origins.map((origin) => <Pressable key={origin} onPress={() => setCatalogOrigin(origin)} style={[styles.categoryChip, catalogOrigin === origin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityState={{ selected: catalogOrigin === origin }}><Text style={[styles.categoryChipText, catalogOrigin === origin && styles.categoryChipTextSelected]}>{origin}</Text></Pressable>)}
+              <Pressable onPress={() => setCatalogOrigin("")} style={[styles.categoryChip, !catalogOrigin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Semua asal, ${originFacetProducts.length} produk`} accessibilityState={{ selected: !catalogOrigin }}><Text style={[styles.categoryChipText, !catalogOrigin && styles.categoryChipTextSelected]}>Semua asal ({originFacetProducts.length})</Text></Pressable>
+              {origins.map((origin) => <Pressable key={origin} onPress={() => setCatalogOrigin(origin)} style={[styles.categoryChip, catalogOrigin === origin && styles.categoryChipSelected]} accessibilityRole="button" accessibilityLabel={`Asal ${origin}, ${originFacetCounts.get(origin) ?? 0} produk`} accessibilityState={{ selected: catalogOrigin === origin }}><Text style={[styles.categoryChipText, catalogOrigin === origin && styles.categoryChipTextSelected]}>{origin} ({originFacetCounts.get(origin) ?? 0})</Text></Pressable>)}
             </ScrollView>
             <Text style={styles.label}>Urutkan</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled" accessibilityLabel="Urutkan produk">
