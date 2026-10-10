@@ -26,6 +26,21 @@ export type CreateInquiryResult = {
   createdAt: string;
 };
 
+export type SyncStatus = {
+  enabled: boolean;
+  peerCount: number;
+  pendingDeliveries: number;
+  retryingDeliveries: number;
+  conflicts: number;
+};
+
+export type ApiHealth = {
+  status: "ok";
+  nodeId: string;
+  syncEnabled: boolean;
+  syncStatus: SyncStatus;
+};
+
 async function readJson<T>(response: Response): Promise<T> {
   let payload: unknown;
   try {
@@ -71,6 +86,12 @@ export function createApiClient(apiBaseUrl: string, fetcher: typeof fetch = fetc
   }
 
   return {
+    async getHealth(): Promise<ApiHealth> {
+      const health = await requestJson<ApiHealth>("/health");
+      if (health.status !== "ok" || !health.syncStatus) throw new Error("API belum siap.");
+      return health;
+    },
+
     async getProducts(): Promise<Product[]> {
       const result = await requestJson<{ data: Product[] }>("/api/v1/products");
       return result.data;
