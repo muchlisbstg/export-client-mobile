@@ -69,7 +69,8 @@ export function getFacetCounts<T extends Pick<Product, CatalogFacetField>>(
 export function filterProducts(products: readonly Product[], query = "", category = "", origin = "", unit = ""): Product[] {
   const normalizedQuery = normalizeCatalogText(query);
   return products.filter((product) => {
-    const matchesQuery = !normalizedQuery || normalizeCatalogText(`${product.name} ${product.category} ${product.origin}`).includes(normalizedQuery);
+    const searchableText = normalizeCatalogText([product.name, product.category, product.origin, product.unit].filter(Boolean).join(" "));
+    const matchesQuery = !normalizedQuery || searchableText.includes(normalizedQuery);
     const matchesCategory = !category || product.category === category;
     const matchesOrigin = !origin || product.origin === origin;
     const matchesUnit = !unit || product.unit === unit;
