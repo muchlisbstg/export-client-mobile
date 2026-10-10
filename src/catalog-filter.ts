@@ -20,15 +20,16 @@ export const catalogSortOptions: ReadonlyArray<{ field: CatalogSortField; label:
   { field: "unit", label: "Satuan" },
 ];
 
-export type ActiveCatalogFilter = { key: "search" | "category" | "origin"; value: string };
+export type ActiveCatalogFilter = { key: "search" | "category" | "origin" | "unit"; value: string };
 
 /** Describe active filters in a stable order for the removable filter summary. */
-export function getActiveCatalogFilters(query: string, category: string, origin: string): ActiveCatalogFilter[] {
+export function getActiveCatalogFilters(query: string, category: string, origin: string, unit = ""): ActiveCatalogFilter[] {
   const filters: ActiveCatalogFilter[] = [];
   const trimmedQuery = query.trim();
   if (trimmedQuery) filters.push({ key: "search", value: trimmedQuery });
   if (category) filters.push({ key: "category", value: category });
   if (origin) filters.push({ key: "origin", value: origin });
+  if (unit) filters.push({ key: "unit", value: unit });
   return filters;
 }
 
@@ -43,7 +44,12 @@ export function getOrigins(products: readonly Product[]): string[] {
   return [...origins].sort((a, b) => a.localeCompare(b, "id-ID", { sensitivity: "base" }));
 }
 
-export type CatalogFacetField = "category" | "origin";
+export function getUnits(products: readonly Product[]): string[] {
+  const units = new Set(products.map((product) => product.unit).filter((unit): unit is string => Boolean(unit)));
+  return [...units].sort((a, b) => a.localeCompare(b, "id-ID", { sensitivity: "base" }));
+}
+
+export type CatalogFacetField = "category" | "origin" | "unit";
 
 /** Count non-empty facet values in the supplied, already-filtered catalog subset. */
 export function getFacetCounts<T extends Pick<Product, CatalogFacetField>>(
@@ -60,13 +66,14 @@ export function getFacetCounts<T extends Pick<Product, CatalogFacetField>>(
 }
 
 /** Filter without mutating the fetched catalog; text, category, and origin are combined with AND. */
-export function filterProducts(products: readonly Product[], query = "", category = "", origin = ""): Product[] {
+export function filterProducts(products: readonly Product[], query = "", category = "", origin = "", unit = ""): Product[] {
   const normalizedQuery = normalizeCatalogText(query);
   return products.filter((product) => {
     const matchesQuery = !normalizedQuery || normalizeCatalogText(`${product.name} ${product.category} ${product.origin}`).includes(normalizedQuery);
     const matchesCategory = !category || product.category === category;
     const matchesOrigin = !origin || product.origin === origin;
-    return matchesQuery && matchesCategory && matchesOrigin;
+    const matchesUnit = !unit || product.unit === unit;
+    return matchesQuery && matchesCategory && matchesOrigin && matchesUnit;
   });
 }
 
