@@ -17,6 +17,7 @@ import { formatComparisonCsv, formatComparisonShare, getComparisonFieldsToDispla
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
 import { filterOutComparedProducts } from "./src/catalog-compare";
+import { formatCatalogCsv } from "./src/catalog-csv";
 
 const comparisonFieldLabels: Record<ComparisonField, string> = { category: "Kategori", origin: "Asal", unit: "Satuan" };
 const colors = { ink: "#17352c", green: "#194b3c", sage: "#78904a", muted: "#748078", line: "#dfe5de", paper: "#f6f7f3", white: "#ffffff", lime: "#c9d96d", danger: "#a33131" };
@@ -83,6 +84,7 @@ export default function App() {
   const [hideComparedProducts, setHideComparedProducts] = useState(false);
   const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
   const [catalogShareNotice, setCatalogShareNotice] = useState("");
+  const [catalogCsvNotice, setCatalogCsvNotice] = useState("");
   const [comparisonShareNotice, setComparisonShareNotice] = useState("");
   const [comparisonCsvNotice, setComparisonCsvNotice] = useState("");
   const catalogSearchRef = useRef<TextInput>(null);
@@ -161,6 +163,17 @@ export default function App() {
       if (result.action === Share.sharedAction) setCatalogShareNotice("Daftar katalog siap dibagikan.");
     } catch (caught) {
       setCatalogShareNotice(caught instanceof Error ? caught.message : "Daftar katalog tidak dapat dibagikan.");
+    }
+  }
+
+  async function shareCatalogCsv() {
+    try {
+      const csv = formatCatalogCsv(visibleProducts);
+      if (!csv) throw new Error("Tidak ada hasil katalog untuk dibagikan.");
+      const result = await Share.share({ title: "Katalog produk CSV", message: csv });
+      if (result.action === Share.sharedAction) setCatalogCsvNotice("CSV katalog siap dibagikan.");
+    } catch (caught) {
+      setCatalogCsvNotice(caught instanceof Error ? caught.message : "CSV katalog tidak dapat dibagikan.");
     }
   }
 
@@ -316,8 +329,12 @@ export default function App() {
               <Pressable onPress={() => void shareCatalogResults()} disabled={visibleProducts.length === 0} style={[shareStyles.button, visibleProducts.length === 0 && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel="Bagikan hasil katalog" accessibilityState={{ disabled: visibleProducts.length === 0 }}>
                 <Text style={shareStyles.buttonText}>Bagikan hasil</Text>
               </Pressable>
+              <Pressable onPress={() => void shareCatalogCsv()} disabled={visibleProducts.length === 0} style={[shareStyles.button, visibleProducts.length === 0 && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel="Bagikan hasil katalog sebagai CSV" accessibilityState={{ disabled: visibleProducts.length === 0 }}>
+                <Text style={shareStyles.buttonText}>Bagikan CSV</Text>
+              </Pressable>
             </View>
             {catalogShareNotice ? <Text style={shareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{catalogShareNotice}</Text> : null}
+            {catalogCsvNotice ? <Text style={shareStyles.notice} accessibilityRole="text" accessibilityLiveRegion="polite">{catalogCsvNotice}</Text> : null}
             {selectedProductHidden || selectedProductHiddenByComparison ? <View style={styles.selectedHidden}><Text style={styles.selectedHiddenText}>Terpilih: {selectedProductRecord?.name}</Text><Pressable onPress={() => { if (selectedProductHiddenByComparison) setHideComparedProducts(false); else resetCatalogFilters(); }} accessibilityRole="button"><Text style={styles.showSelectedText}>Tampilkan pilihan</Text></Pressable></View> : null}
             {visibleProducts.length === 0 ? <View style={styles.emptyFilter}><Text style={styles.emptyFilterTitle}>{hideComparedProducts && matchingProducts.length > 0 ? "Semua hasil sudah dibandingkan" : "Tidak ada produk yang cocok"}</Text><Text style={styles.emptyFilterCopy}>{hideComparedProducts && matchingProducts.length > 0 ? "Produk yang sudah dipilih untuk perbandingan disembunyikan." : "Coba ubah pencarian, kategori, asal, atau satuan."}</Text><Pressable onPress={() => hideComparedProducts && matchingProducts.length > 0 ? setHideComparedProducts(false) : resetCatalogFilters()} accessibilityRole="button" style={styles.emptyAction}><Text style={styles.emptyActionText}>{hideComparedProducts && matchingProducts.length > 0 ? "Tampilkan semua hasil" : "Hapus filter"}</Text></Pressable></View> : visibleProducts.map((product) => {
               const index = products.findIndex((item) => item.id === product.id);
