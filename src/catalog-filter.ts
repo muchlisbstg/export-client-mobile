@@ -67,10 +67,10 @@ export function getFacetCounts<T extends Pick<Product, CatalogFacetField>>(
 
 /** Filter without mutating the fetched catalog; text, category, and origin are combined with AND. */
 export function filterProducts(products: readonly Product[], query = "", category = "", origin = "", unit = ""): Product[] {
-  const normalizedQuery = normalizeCatalogText(query);
+  const queryTerms = normalizeCatalogText(query).split(/\s+/u).filter(Boolean);
   return products.filter((product) => {
     const searchableText = normalizeCatalogText([product.name, product.category, product.origin, product.unit].filter(Boolean).join(" "));
-    const matchesQuery = !normalizedQuery || searchableText.includes(normalizedQuery);
+    const matchesQuery = queryTerms.every((term) => searchableText.includes(term));
     const matchesCategory = !category || product.category === category;
     const matchesOrigin = !origin || product.origin === origin;
     const matchesUnit = !unit || product.unit === unit;
