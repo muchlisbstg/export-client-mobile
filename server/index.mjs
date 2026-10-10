@@ -256,7 +256,16 @@ export function createServer(options = {}) {
 
   app.get("/health", (_req, res) => {
     db.prepare("SELECT 1").get();
-    res.json({ status: "ok", nodeId, syncEnabled });
+    const pendingDeliveries = db.prepare("SELECT COUNT(*) AS count FROM sync_outbox").get().count;
+    const retryingDeliveries = db.prepare("SELECT COUNT(*) AS count FROM sync_outbox WHERE last_error IS NOT NULL").get().count;
+    const conflicts = db.prepare("SELECT COUNT(*) AS count FROM sync_conflicts").get().count;
+    res.setHeader("Cache-Control", "no-store");
+    res.json({
+      status: "ok",
+      nodeId,
+      syncEnabled,
+      syncStatus: { enabled: syncEnabled, peerCount: peers.length, pendingDeliveries, retryingDeliveries, conflicts },
+    });
   });
 
   app.get("/api/v1/products", (_req, res) => {

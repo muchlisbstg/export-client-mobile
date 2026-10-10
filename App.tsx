@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { createInquiry, getProducts, trackInquiry, type InquiryStatus, type Product } from "./src/api";
+import { createInquiry, getHealth, getProducts, trackInquiry, type InquiryStatus, type Product, type SyncStatus } from "./src/api";
 import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, getUnits, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { formatComparisonCsv, formatComparisonShare, getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
@@ -59,6 +59,8 @@ function SectionTitle({ eyebrow, children }: { eyebrow: string; children: ReactN
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncStatusLoading, setSyncStatusLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -104,8 +106,20 @@ export default function App() {
     }
   }
 
+  async function refreshSyncStatus() {
+    setSyncStatusLoading(true);
+    try {
+      setSyncStatus((await getHealth()).syncStatus);
+    } catch {
+      setSyncStatus(null);
+    } finally {
+      setSyncStatusLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadProducts();
+    void refreshSyncStatus();
   }, []);
 
   const categories = getCategories(products);
@@ -241,6 +255,7 @@ export default function App() {
       setCustomerEmail("");
       setDestinationCountry("");
       setFieldErrors({});
+      void refreshSyncStatus();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Permintaan gagal dikirim.");
     } finally {
@@ -283,6 +298,14 @@ export default function App() {
           <Text style={styles.heroKicker}>PERMINTAAN EKSPOR, LEBIH TERHUBUNG.</Text>
           <Text style={styles.heroTitle}>Satu permintaan.{"\n"}<Text style={styles.heroAccent}>Lintas perangkat.</Text></Text>
           <Text style={styles.heroCopy}>Katalog dan status tersimpan di backend lokal mobile. Peer sync opsional menghubungkan web dan desktop.</Text>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: "#f7f9f4" }]} accessibilityRole="summary" accessibilityLiveRegion="polite">
+          <SectionTitle eyebrow="SINKRONISASI PEER-TO-PEER">Status lokal</SectionTitle>
+          <Text style={styles.mutedText}>{syncStatusLoading ? "Memeriksa status…" : !syncStatus ? "Status belum tersedia." : !syncStatus.enabled ? "Sinkronisasi tidak diaktifkan." : syncStatus.peerCount > 0 ? `Diaktifkan · ${syncStatus.peerCount} peer dikonfigurasi.` : "Diaktifkan · belum ada peer."}</Text>
+          {syncStatus ? <Text style={[styles.mutedText, { marginTop: 6 }]}>{`Antrean: ${syncStatus.pendingDeliveries} · Perlu coba ulang: ${syncStatus.retryingDeliveries} · Konflik: ${syncStatus.conflicts}`}</Text> : null}
+          <Text style={[styles.mutedText, { fontSize: 9, marginTop: 5 }]}>Ringkasan lokal; koneksi peer tidak diuji langsung.</Text>
+          <Pressable onPress={() => void refreshSyncStatus()} disabled={syncStatusLoading} style={[shareStyles.button, { alignSelf: "flex-start", marginTop: 10 }, syncStatusLoading && shareStyles.buttonDisabled]} accessibilityRole="button" accessibilityLabel="Perbarui status sinkronisasi P2P" accessibilityState={{ disabled: syncStatusLoading }}><Text style={shareStyles.buttonText}>Perbarui status</Text></Pressable>
         </View>
 
         <View style={styles.card}>
