@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { createInquiry, getHealth, getProducts, trackInquiry, type InquiryStatus, type Product, type SyncStatus } from "./src/api";
-import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, getUnits, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
+import { catalogSortOptions, filterProducts, getActiveCatalogFilters, getCatalogSearchHighlightParts, getCategories, getFacetCounts, getOrigins, getUnits, sortProducts, type CatalogSortDirection, type CatalogSortField } from "./src/catalog-filter";
 import { formatComparisonCsv, formatComparisonShare, getComparisonFieldsToDisplay, getDifferingComparisonFields, MAX_COMPARE_PRODUCTS, toggleCompareSelection, type ComparisonField } from "./src/catalog-compare";
 import { validateInquiryField, validateInquiryForm, type InquiryField, type InquiryFieldErrors } from "./src/rfq-validation";
 import { formatCatalogShare } from "./src/catalog-share";
@@ -55,6 +55,11 @@ function Field({ label, value, onChangeText, placeholder, error, keyboardType = 
 
 function SectionTitle({ eyebrow, children }: { eyebrow: string; children: ReactNode }) {
   return <View style={styles.sectionTitle}><Text style={styles.eyebrow}>{eyebrow}</Text><Text style={styles.sectionHeading}>{children}</Text></View>;
+}
+
+function CatalogSearchHighlight({ value, query }: { value: string; query: string }) {
+  const parts = getCatalogSearchHighlightParts(value, query);
+  return <>{parts.map((part, index) => <Text key={index} style={part.matched ? { backgroundColor: "#f2e7a4", fontWeight: "800" } : undefined}>{part.text}</Text>)}</>;
 }
 
 export default function App() {
@@ -380,7 +385,7 @@ export default function App() {
               return <View key={product.id} style={[styles.productRow, compareStyles.productRow, selectedProduct === product.id && styles.productSelected]}>
                 <Pressable onPress={() => updateInquiryField("productId", product.id)} style={compareStyles.productMain} accessibilityRole="radio" accessibilityState={{ selected: selectedProduct === product.id }} accessibilityHint={fieldErrors.productId ? "Pilih produk untuk menghapus kesalahan." : undefined}>
                   <View style={[styles.productIcon, index === 1 && styles.productIconAlt, index === 2 && styles.productIconThird]}><Text style={styles.productIconText}>{String(index + 1).padStart(2, "0")}</Text></View>
-                  <View style={styles.productCopy}><Text style={styles.productName}>{product.name}</Text><Text style={styles.productMeta}>{product.category} · {product.origin} · per {product.unit}</Text></View>
+                  <View style={styles.productCopy}><Text style={styles.productName}><CatalogSearchHighlight value={product.name} query={catalogQuery} /></Text><Text style={styles.productMeta}><CatalogSearchHighlight value={product.category} query={catalogQuery} /> · <CatalogSearchHighlight value={product.origin} query={catalogQuery} /> · per <CatalogSearchHighlight value={product.unit} query={catalogQuery} /></Text></View>
                   <View style={[styles.radio, selectedProduct === product.id && styles.radioSelected]}>{selectedProduct === product.id && <View style={styles.radioInner} />}</View>
                 </Pressable>
                 <View style={compareStyles.productActions}><Pressable onPress={() => toggleCompare(product.id)} disabled={!isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS} style={[compareStyles.toggle, isCompared && compareStyles.toggleSelected, !isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS && compareStyles.toggleDisabled]} accessibilityRole="button" accessibilityLabel={`${isCompared ? "Hapus dari" : "Tambah ke"} perbandingan: ${product.name}`} accessibilityState={{ selected: isCompared, disabled: !isCompared && compareProductIds.length >= MAX_COMPARE_PRODUCTS }}><Text style={[compareStyles.toggleText, isCompared && compareStyles.toggleSelectedText]}>{isCompared ? "✓ Ditambahkan" : "Bandingkan"}</Text></Pressable></View>

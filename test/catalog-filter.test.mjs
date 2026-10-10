@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { filterProducts, getActiveCatalogFilters, getCategories, getFacetCounts, getOrigins, getUnits, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
+import { filterProducts, getActiveCatalogFilters, getCatalogSearchHighlightParts, getCategories, getFacetCounts, getOrigins, getUnits, normalizeCatalogText, sortProducts } from "../src/catalog-filter.ts";
 import { MAX_COMPARE_PRODUCTS, toggleCompareSelection } from "../src/catalog-compare.ts";
 
 const products = [
@@ -29,6 +29,24 @@ test("multi-word search matches every term in any order across product attribute
   assert.deepEqual(filterProducts(products, "teh sumatera kg").map((p) => p.id), ["tea"]);
   assert.deepEqual(filterProducts(products, "kopi sumatera"), []);
   assert.deepEqual(filterProducts(products, "   ").map((p) => p.id), products.map((p) => p.id));
+});
+
+test("search highlighting follows accent-insensitive multi-word matching", () => {
+  assert.deepEqual(getCatalogSearchHighlightParts("Café Arabica", "  ARABICA cafe "), [
+    { text: "Café", matched: true },
+    { text: " ", matched: false },
+    { text: "Arabica", matched: true },
+  ]);
+  assert.deepEqual(getCatalogSearchHighlightParts("Cafe\u0301", "cafe"), [{ text: "Cafe\u0301", matched: true }]);
+});
+
+test("search highlighting preserves unmatched text and merges overlapping matches", () => {
+  assert.deepEqual(getCatalogSearchHighlightParts("Robusta", "café"), [{ text: "Robusta", matched: false }]);
+  assert.deepEqual(getCatalogSearchHighlightParts("banana", "ana na"), [
+    { text: "b", matched: false },
+    { text: "anana", matched: true },
+  ]);
+  assert.deepEqual(getCatalogSearchHighlightParts("Robusta", "   "), [{ text: "Robusta", matched: false }]);
 });
 
 test("categories are dynamic, unique, non-empty, and Indonesian-locale sorted", () => {
