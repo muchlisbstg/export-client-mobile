@@ -74,6 +74,7 @@ export default function App() {
   const trackingLock = useRef(false);
   const [error, setError] = useState("");
   const [trackingCode, setTrackingCode] = useState("");
+  const [trackingCodeNotice, setTrackingCodeNotice] = useState("");
   const [trackingInput, setTrackingInput] = useState("");
   const [trackedInquiry, setTrackedInquiry] = useState<InquiryStatus | null>(null);
   const [catalogQuery, setCatalogQuery] = useState("");
@@ -214,6 +215,19 @@ export default function App() {
     }
   }
 
+  async function shareTrackingCode() {
+    setTrackingCodeNotice("");
+    try {
+      const result = await Share.share({
+        title: "Kode pelacakan permintaan",
+        message: `Kode pelacakan: ${trackingCode}`,
+      });
+      if (result.action === Share.sharedAction) setTrackingCodeNotice("Kode pelacakan siap dibagikan.");
+    } catch (caught) {
+      setTrackingCodeNotice(caught instanceof Error ? caught.message : "Kode pelacakan tidak dapat dibagikan.");
+    }
+  }
+
   function updateInquiryField(field: InquiryField, value: string) {
     switch (field) {
       case "customerName": setCustomerName(value); break;
@@ -250,6 +264,7 @@ export default function App() {
         quantity: numericQuantity,
       });
       setTrackingCode(result.trackingCode);
+      setTrackingCodeNotice("");
       setTrackingInput(result.trackingCode);
       setCustomerName("");
       setCustomerEmail("");
@@ -408,7 +423,7 @@ export default function App() {
           <Pressable style={[styles.primaryButton, (submitting || loading || products.length === 0) && styles.disabledButton]} onPress={() => void submit()} disabled={submitting || loading || products.length === 0} accessibilityRole="button">
             {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.primaryButtonText}>Kirim permintaan <Text style={styles.buttonArrow}>↗</Text></Text>}
           </Pressable>
-          {trackingCode ? <View style={styles.successBox}><Text style={styles.successTitle}>Permintaan tersimpan</Text><Text style={styles.successCopy}>Simpan kode ini untuk melacak permintaan dari perangkat mana pun.</Text><Text selectable style={styles.code}>{trackingCode}</Text></View> : null}
+          {trackingCode ? <View style={styles.successBox}><Text style={styles.successTitle}>Permintaan tersimpan</Text><Text style={styles.successCopy}>Simpan kode ini untuk melacak permintaan dari perangkat mana pun.</Text><Text selectable style={styles.code}>{trackingCode}</Text><Pressable style={[shareStyles.button, { alignSelf: "flex-start", marginTop: 10 }]} onPress={() => void shareTrackingCode()} accessibilityRole="button" accessibilityLabel="Bagikan kode pelacakan"><Text style={shareStyles.buttonText}>Bagikan kode</Text></Pressable>{trackingCodeNotice ? <Text style={shareStyles.notice} accessibilityLiveRegion="polite">{trackingCodeNotice}</Text> : null}</View> : null}
         </View>
 
         <View style={[styles.card, styles.trackCard]}>
