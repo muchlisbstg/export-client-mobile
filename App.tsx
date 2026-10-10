@@ -331,7 +331,7 @@ export default function App() {
             <Pressable onPress={() => void loadProducts()} style={[styles.emptyAction, { backgroundColor: colors.green, borderColor: colors.green }]} accessibilityRole="button"><Text style={[styles.emptyActionText, { color: colors.white }]}>Coba lagi</Text></Pressable>
           </View> : products.length === 0 ? <Text style={styles.mutedText}>Katalog belum tersedia.</Text> : <>
             <View style={styles.searchWrap}>
-              <TextInput ref={catalogSearchRef} accessibilityLabel="Cari nama, kategori, atau asal" style={styles.searchInput} value={catalogQuery} onChangeText={setCatalogQuery} placeholder="Cari nama, kategori, atau asal" placeholderTextColor="#98a29b" autoCapitalize="none" autoCorrect={false} />
+              <TextInput ref={catalogSearchRef} accessibilityLabel="Cari nama, kategori, asal, atau satuan" style={styles.searchInput} value={catalogQuery} onChangeText={setCatalogQuery} placeholder="Cari nama, kategori, asal, atau satuan" placeholderTextColor="#98a29b" autoCapitalize="none" autoCorrect={false} />
               {catalogQuery.length > 0 ? <Pressable onPress={() => setCatalogQuery("")} style={styles.clearButton} accessibilityRole="button" accessibilityLabel="Bersihkan pencarian"><Text style={styles.clearButtonText}>×</Text></Pressable> : null}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={styles.categoryChips} keyboardShouldPersistTaps="handled">
